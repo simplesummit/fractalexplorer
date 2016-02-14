@@ -13,6 +13,7 @@ communication stuff between head and child nodes
 #include "fr.h"
 
 #include "lz4.h"
+#include "lz4hc.h"
 
 #include "engine_c.h"
 #ifdef HAVE_CUDA
@@ -577,13 +578,16 @@ void slave_loop() {
 
         if (fractal_params.flags & FRACTAL_FLAG_USE_COMPRESSION) {
             tperf_start(compress_perf);
-            int compressed_size = LZ4_compress_default((char *)my_result, (char *)my_compressed_buffer, my_result_size, LZ4_compressBound(my_result_size));
+            //int compressed_size = LZ4_compress_default((char *)my_result, (char *)my_compressed_buffer, my_result_size, LZ4_compressBound(my_result_size));
+            int compressed_size = LZ4_compress_HC((char *)my_result, (char *)my_compressed_buffer, my_result_size, LZ4_compressBound(my_result_size), 12); // min 3, max 12
             tperf_end(compress_perf);
 
             tperf_start(io_perf);
             //MPI_Send(&compressed_size, 1, MPI_INT, 0, 0, MPI_COMM_WORLD); 
             MPI_Send(my_compressed_buffer, compressed_size, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
             tperf_end(io_perf);
+            if (world_rank == world_size - 1) log_trace("comp ratio: %lf\n", (double)compressed_size / my_result_size);
+
         } else {
             // so it is zero
             tperf_start(compress_perf);

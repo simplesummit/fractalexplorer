@@ -523,10 +523,10 @@ void visuals_sdl_update(unsigned char * fractal_pixels) {
 
         if (nodes[w].type == NODE_TYPE_CPU) {
             num_cpus++;
-            sprintf(info_graph_messages[1], "    #%2d", w);
+            sprintf(info_graph_messages[1], "   G#%2d", w);
         } else {
             num_gpus++;
-            sprintf(info_graph_messages[1], "    #%2d", w);
+            sprintf(info_graph_messages[1], "   C#%2d", w);
         }
 
 
@@ -634,6 +634,7 @@ void visuals_sdl_update(unsigned char * fractal_pixels) {
         int k;
         float min_time = INFINITY;
         float max_time = -INFINITY;
+        float avg_time = 0.0;
         for (k = 1; k < world_size; ++k) {
             if (last_diagnostics.node_information[k].time_total < min_time) {
                 min_time = last_diagnostics.node_information[k].time_total;
@@ -641,9 +642,10 @@ void visuals_sdl_update(unsigned char * fractal_pixels) {
             if (last_diagnostics.node_information[k].time_total > max_time) {
                 max_time = last_diagnostics.node_information[k].time_total;
             }
+            avg_time += last_diagnostics.node_information[k].time_total;
         }
-        
-        float differential = (max_time - min_time) / max_time;
+        avg_time /= (world_size - 1);
+        float differential = min_time / avg_time;//(max_time - min_time) / max_time;
 
 
         sprintf(info_graph_messages[4], "Parallelism: %.1f%s", 100.0 * (1.0 - differential), "%%");
