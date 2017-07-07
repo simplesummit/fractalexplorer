@@ -3,3 +3,8 @@
 *.out
 *.tar*
 *.zip
+
+src/particle_sim
+src/mandelbrot
+
+
