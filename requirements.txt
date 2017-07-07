@@ -1,0 +1,7 @@
+PyVRML97
+OpenGLContext
+PyOpenGL
+PyOpenGL_accelerate
+pydispatcher
+pillow
+numpy
