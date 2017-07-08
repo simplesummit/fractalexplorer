@@ -62,6 +62,8 @@ void set_uniform1f(unsigned int prog, const char *name, float val) {
 	int loc = glGetUniformLocationARB(prog, name);
 	if(loc != -1) {
 		glUniform1f(loc, val);
+	} else {
+		printf("OpenGL uniform error for name: '%s'\n", name);
 	}
 }
 
@@ -69,13 +71,18 @@ void set_uniform2f(unsigned int prog, const char *name, float v1, float v2) {
 	int loc = glGetUniformLocationARB(prog, name);
 	if(loc != -1) {
 		glUniform2f(loc, v1, v2);
+	} else {
+		printf("OpenGL uniform error for name: '%s'\n", name);
 	}
 }
 void set_uniform1i(unsigned int prog, const char *name, int val) {
         int loc = glGetUniformLocationARB(prog, name);
         if(loc != -1) {
-            glUniform1f(loc, val);
-        }
+            glUniform1i(loc, val);
+        }else {
+		printf("OpenGL uniform error for name: '%s'\n", name);
+
+	}
 }
 
 

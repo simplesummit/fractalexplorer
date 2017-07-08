@@ -14,10 +14,6 @@
 #include <mpi.h>
 
 
-typedef struct rgb_t {
-    float r, g, b;
-} rgb_t;
-
 
 typedef struct fr_t {
     double cX, cY, Z, er2;

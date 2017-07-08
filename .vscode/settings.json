@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "gl.h": "c",
+        "mandelbrot.h": "c",
+        "getopt.h": "c",
+        "freeglut_std.h": "c"
+    }
+}
