@@ -11,8 +11,6 @@ int world_size, world_rank;
 char processor_name[MPI_MAX_PROCESSOR_NAME];
 int processor_name_len;
 
-fr_t fr;
-
 #define M_EXIT(n) MPI_Finalize(); exit(0);
 
 #define GETOPT_STOP ((char)-1)
@@ -69,7 +67,7 @@ int main(int argc, char ** argv) {
     if (IS_HEAD) {
         res = parse_args(argc, argv);
     }
-    
+
     MPI_Bcast(&res, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
     if (res >= 0) {
@@ -89,15 +87,42 @@ int main(int argc, char ** argv) {
 
 
     if (IS_HEAD) {
-        fr.cX = .2821; fr.cY = .01;
+
+        fr.cX = .2821;
+        fr.cY = .01;
         fr.Z = 50;
         fr.max_iter = 1000;
         fr.w = 800;
         fr.h = 600;
         fr.h_off = 0;
+
         mandelbrot_render(&argc, argv);
+        /*
+        int rowseach_compute = fr.h / compute_size;
+
+        if (fr.h % compute_size != 0) {
+            printf("fail compute size\n");
+            exit(3);
+        }
+
+        fr_recombo_t fr_recombo;
+        fr_recombo.num_workers = compute_size;
+        fr_recombo.workers = (fr_t *)malloc(sizeof(fr_t) * fr_recombo.num_workers);
+        fr_recombo.idata = (fr_wr_t *)malloc(sizeof(fr_wr_t) * fr_recombo.num_workers);
+
+        int i;
+        for (i = 0; i < fr_recombo.num_workers; ++i) {
+            fr_recombo.workers[i] = fr;
+            fr_recombo.workers[i]._data = (double *)malloc(sizeof(double) * fr.w * rowseach_compute);
+            fr_recombo.idata[i]._data = (double *)malloc(sizeof(double) * fr.w * rowseach_compute);
+        }
+
+        fr_recombo._data = (double *)malloc(sizeof(double) * fr.w * fr.h);
+
+        */
+
     } else {
-        
+
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
@@ -107,10 +132,7 @@ int main(int argc, char ** argv) {
 }
 
 void start_render() {
-    int rowseach_compute = fr.h / compute_size;
-    if (fr.h % compute_size != 0) {
-        rowseach_compute++;
-    }
+
     int sizeeach_compute = rowseach_compute * fr.w;
     fr_t * compute_nodes = (fr_t * )malloc(sizeof(fr_t) * compute_size);
     double ** compute_nodes_out = (double **)malloc(sizeof(double *) * compute_size);
@@ -120,7 +142,7 @@ void start_render() {
         compute_nodes[i].cY = fr.cY;
         compute_nodes[i].Z = fr.Z;
         compute_nodes[i].max_iter = fr.max_iter;
-        compute_nodes[i].h_off = i * rowseach_compute; 
+        compute_nodes[i].h_off = i * rowseach_compute;
         compute_nodes_out[i] = (double *)malloc(sizeof(double) * sizeeach_compute);
     }
 
@@ -131,5 +153,3 @@ void start_render() {
 void start_compute() {
 
 }
-
-
