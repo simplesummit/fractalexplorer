@@ -18,7 +18,10 @@
 typedef struct fr_t {
     double cX, cY, Z, er2;
 
-    int max_iter;
+    int h_off;
+
+    int max_iter, w, h;
+
 } fr_t;
 
 typedef struct mandelbrot_argp_t {

@@ -5,8 +5,11 @@
 #ifndef __MANDELBROT_RENDER_H__
 #define __MANDELBROT_RENDER_H__
 
-void mandlebrot_render(int * argc, char ** argv);
+void mandelbrot_render(int * argc, char ** argv);
 
+void mouse_handler(int button, int state, int x, int y);
+
+void motion_handler(int x, int y);
 
 void draw();
 

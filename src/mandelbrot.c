@@ -89,12 +89,15 @@ int main(int argc, char ** argv) {
 
 
     if (IS_HEAD) {
-        fr.cX = 0; fr.cY = 0;
-        fr.Z = .5;
-        fr.max_iter = 20;
+        fr.cX = .2821; fr.cY = .01;
+        fr.Z = 50;
+        fr.max_iter = 1000;
+        fr.w = 800;
+        fr.h = 600;
+        fr.h_off = 0;
         mandelbrot_render(&argc, argv);
     } else {
-
+        
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
@@ -104,6 +107,23 @@ int main(int argc, char ** argv) {
 }
 
 void start_render() {
+    int rowseach_compute = fr.h / compute_size;
+    if (fr.h % compute_size != 0) {
+        rowseach_compute++;
+    }
+    int sizeeach_compute = rowseach_compute * fr.w;
+    fr_t * compute_nodes = (fr_t * )malloc(sizeof(fr_t) * compute_size);
+    double ** compute_nodes_out = (double **)malloc(sizeof(double *) * compute_size);
+    int i;
+    for (i = 0; i < compute_size; ++i) {
+        compute_nodes[i].cX = fr.cX;
+        compute_nodes[i].cY = fr.cY;
+        compute_nodes[i].Z = fr.Z;
+        compute_nodes[i].max_iter = fr.max_iter;
+        compute_nodes[i].h_off = i * rowseach_compute; 
+        compute_nodes_out[i] = (double *)malloc(sizeof(double) * sizeeach_compute);
+    }
+
 
 }
 
