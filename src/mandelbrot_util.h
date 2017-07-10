@@ -3,11 +3,11 @@
 #ifndef __MANDELBROT_UTIL_H__
 #define __MANDELBROT_UTIL_H__
 
-#include "GL/gl.h"
-
+#include <GL/gl.h>
 
 GLhandleARB glCreateShaderObjectARB(GLenum);
 void glShaderSourceARB(GLhandleARB, int, const char**, int*);
+
 void glCompileShaderARB(GLhandleARB);
 GLhandleARB glCreateProgramObjectARB(void);
 void glAttachObjectARB(GLhandleARB, GLhandleARB);
@@ -27,4 +27,3 @@ void set_uniform1i(unsigned int prog, const char *name, int val);
 
 
 #endif
-

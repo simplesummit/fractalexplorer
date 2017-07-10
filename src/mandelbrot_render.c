@@ -4,22 +4,23 @@
 #include "mandelbrot_render.h"
 #include "mandelbrot_util.h"
 
-#include <GL/glut.h>
 #include <GL/gl.h>
+
+#include <GL/glut.h>
 
 
 
 unsigned int prog;
 
 void mandelbrot_render(int * argc, char ** argv) {
-        
+
     glutInit(argc, argv);
 
     glutInitWindowSize(800, 600);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glutCreateWindow("Mandelbrot Render");
-    
+
     glEnable(GL_TEXTURE_2D);
 
     glutDisplayFunc(draw);
@@ -36,7 +37,7 @@ void mandelbrot_render(int * argc, char ** argv) {
     set_uniform1f(prog, "zoom", fr.Z);
     //set_uniform1f(prog, "er2", fr.er2);
     set_uniform1i(prog, "max_iter", fr.max_iter);
-    
+
     gluOrtho2D(-1,1,-1,1);
     glLoadIdentity();
 
@@ -65,5 +66,3 @@ void idle_handler() {
 void key_handler(unsigned char key, int x, int y) {
     printf("key '%c' pressed at %d,%d\n", key, x, y);
 }
-
-
