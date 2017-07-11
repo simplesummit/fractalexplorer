@@ -1,39 +1,71 @@
 //
 
 #include "mandelbrot.h"
+#include "mandelbrot_calc_c.h"
 #include "mandelbrot_render.h"
 #include "mandelbrot_util.h"
+
+
+#include <math.h>
 
 #include <GL/gl.h>
 
 #include <GL/glut.h>
 
 
+tperf_t tperf_render;
 
-unsigned int prog;
+unsigned int prog, texture;
+
+unsigned char * texels;
+
+unsigned int hash;
 
 float last_x, last_y;
 
 int last_bt;
 
-void update_params() {
-    set_uniform1f(prog, "zoom", fr.Z);
-    set_uniform2f(prog, "center",  fr.cX, fr.cY);
-    set_uniform1i(prog, "max_iter", fr.max_iter);
-    
+unsigned int hash_fr(fr_t fr) {
+    return (int)floor( fr.Z + fr.w * (fr.h + fr.Z) - fr.cX - fr.cY + sin(fr.cX + fr.Z * fr.cY / fr.w) + fr.h);
 }
 
+void gather_picture() {
+    tperf_t tp_bc, tp_rv;
+    C_TIME(tp_bc,
+    MPI_Bcast(&fr, 1, mpi_fr_t, 0, MPI_COMM_WORLD);
+    )
+    C_TIME(tp_rv,
+    MPI_Recv(texels, 4 * fr.w * fr.h, MPI_UNSIGNED_CHAR, 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    )
+    log_trace("MPI_Bcast(fr) fps: %lf\n", 1.0 / tp_bc.elapsed_s);
+    log_trace("MPI_Recv(texels) fps: %lf\n", 1.0 / tp_rv.elapsed_s);
+}
+
+
 void window_refresh(int w, int h) {
+
+    if (hash == hash_fr(fr)) {
+        return;
+    }
+
+    if (w != fr.w || h != fr.h || texels == NULL) {
+        log_debug("remallocing render texels\n");
+        free(texels);
+        texels = (unsigned char *)malloc(fr.w * fr.h * 4);
+    }
+
     fr.w = w;
     fr.h = h;
-    glViewport(0, 0, w, h);
-    glMatrixMode(GL_PROJECTION);
-    float aspect = (float)w / h;
-    set_uniform1f(prog, "aspect", aspect);
-    glOrtho(-1, 1, -1, 1, -1, 1);
-    //gluOrtho2D(0.0, 800, 0.0, 600);
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
+
+    // GET PIXEL DATA HERE
+    C_TIME(tperf_render,
+    gather_picture();
+    )
+    log_debug("gather_picture() fps: %lf\n", 1.0 / tperf_render.elapsed_s);
+    //mand_c(fr.w, fr.h, fr.cX, fr.cY, fr.Z, fr.max_iter, texels);
+
+ 
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, fr.w, fr.h, 0, GL_RGBA, GL_UNSIGNED_BYTE, texels);
 
 }
 
@@ -44,10 +76,9 @@ void mandelbrot_render(int * argc, char ** argv) {
 
     glutInitWindowSize(fr.w, fr.h);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
-    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+    glClearColor(0.0f, 0.5f, 0.0f, 1.0f);
     glutCreateWindow("Mandelbrot Render");
 
-    glEnable(GL_TEXTURE_2D);
 
     glutDisplayFunc(draw);
     glutIdleFunc(idle_handler);
@@ -56,33 +87,34 @@ void mandelbrot_render(int * argc, char ** argv) {
     glutMotionFunc(motion_handler);
     glutReshapeFunc(window_refresh);
 
-    if (!(prog = setup_shader("src/mandelbrot_shader.glsl"))) {
-        printf("ERROR with shader\n");
-    }
+    glGenTextures(1, &texture);
+    
+    glBindTexture(GL_TEXTURE_2D, texture);
+    
+    glEnable(GL_TEXTURE_2D);
 
-    //set_uniform1f(prog, "er2", fr.er2);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    
 
+    texels = NULL;
 
-    window_refresh(fr.w, fr.h);
+    //window_refresh(fr.w, fr.h);
     glutMainLoop();
 }
 
 void draw() {
-    update_params();
-
-
-    glBegin(GL_QUADS);
-    glTexCoord2f(0, 0);
-    glVertex2f(-1, -1);
-    glTexCoord2f(1, 0);
-    glVertex2f(1, -1);
-    glTexCoord2f(1, 1);
-    glVertex2f(1, 1);
-    glTexCoord2f(0, 1);
-    glVertex2f(-1, 1);
-    glEnd();
+    C_TIME(tperf_render, 
+    glDrawPixels(fr.w, fr.h, GL_RGBA, GL_UNSIGNED_BYTE, texels);
 
     glutSwapBuffers();
+    );
+    double fps = 1.0 / tperf_render.elapsed_s;
+    if (fps < 15) {
+        log_warn("draw() fps is low: %lf\n", fps);
+    }
+    log_trace("draw() fps: %lf\n", fps);
 }
 
 void idle_handler() {
@@ -94,11 +126,17 @@ void key_handler(unsigned char key, int x, int y) {
 }
 
 void motion_handler(int x, int y) {
+    bool do_refresh = true;
     if (last_bt == GLUT_LEFT_BUTTON) {
-        fr.Z *= 1 + 4 * (y - last_y) * (x - last_x) / (fr.w * fr.h);  
+        fr.Z *= 1 + 20 * (y - last_y) * (x - last_x) / (fr.w * fr.h);  
     } else if(last_bt == GLUT_RIGHT_BUTTON) {
         fr.cX = fr.cX - (x - last_x) / (fr.Z * fr.w);
         fr.cY = fr.cY - (y - last_y) / (fr.Z * fr.h);
+    } else {
+        do_refresh = false;
+    }
+    if (do_refresh) {
+        window_refresh(fr.w, fr.h);
     }
     last_x = x; last_y = y;
 

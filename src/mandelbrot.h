@@ -7,22 +7,24 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <string.h>
 #include <stdbool.h>
 
+#include <time.h>
+#include <sys/time.h>
 #include <getopt.h>
 
 #include <mpi.h>
 
+#include "log.h"
 
 typedef struct fr_t {
   double cX, cY, Z;
-
-  // w * h * sizeof(double)
-  double * _data;
-
+  
   // this is a slice of a bigger image, which begins at h_off.
   // h is very small, as it is split horizontally
-  int max_iter, w, h, h_off;
+  int max_iter, w, h;
 
 } fr_t;
 
@@ -51,10 +53,21 @@ typedef struct mandelbrot_argp_t {
 } mandelbrot_argp_t;
 
 
+#define mpi_fr_numitems (6)
+MPI_Datatype mpi_fr_t;
+int mpi_fr_blocklengths[mpi_fr_numitems];
+MPI_Datatype mpi_fr_types[mpi_fr_numitems];
+MPI_Aint mpi_fr_offsets[mpi_fr_numitems];
+
 
 fr_t fr;
 
+
+
 int main(int argc, char ** argv);
+
+void start_render();
+void start_compute();
 
 
 #endif

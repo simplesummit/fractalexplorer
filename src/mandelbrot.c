@@ -2,14 +2,22 @@
 
 
 
+
 #include "mandelbrot.h"
 #include "mandelbrot_render.h"
-
+#include "mandelbrot_calc_c.h"
 
 int world_size, world_rank;
 
 char processor_name[MPI_MAX_PROCESSOR_NAME];
 int processor_name_len;
+
+#define mpi_fr_numitems (6)
+MPI_Datatype mpi_fr_t;
+int mpi_fr_blocklengths[mpi_fr_numitems] = { 1, 1, 1, 1, 1, 1 };
+MPI_Datatype mpi_fr_types[mpi_fr_numitems] = { MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_INT, MPI_INT, MPI_INT };
+MPI_Aint mpi_fr_offsets[mpi_fr_numitems];
+
 
 #define M_EXIT(n) MPI_Finalize(); exit(0);
 
@@ -25,6 +33,7 @@ int processor_name_len;
 void mandelbrot_show_help() {
     printf("Usage: mandelbrot [-h]\n");
     printf("  -h             show this help menu\n");
+    printf("  -v[N]             show this help menu\n");
     printf("\n");
     printf("Questions? Issues? Please contact:\n");
     printf("<brownce@ornl.gov>\n");
@@ -33,12 +42,15 @@ void mandelbrot_show_help() {
 // returns exit code, or -1 if we shouldn't exit
 int parse_args(int argc, char ** argv) {
     char c;
-    while ((c = getopt(argc, argv, "h")) != GETOPT_STOP) {
+    while ((c = getopt(argc, argv, "v:h")) != GETOPT_STOP) {
 	switch (c) {
             case 'h':
 		mandelbrot_show_help();
 		return 0;
 		break;
+            case 'v':
+                log_set_level(atoi(optarg));
+                break;
             case '?':
 		printf("Unknown argument: -%c\n", optopt);
 		return 1;
@@ -86,15 +98,26 @@ int main(int argc, char ** argv) {
     }
 
 
+    mpi_fr_offsets[0] = offsetof(fr_t, cX);
+    mpi_fr_offsets[1] = offsetof(fr_t, cY);
+    mpi_fr_offsets[2] = offsetof(fr_t, Z);
+    mpi_fr_offsets[4] = offsetof(fr_t, max_iter);
+    mpi_fr_offsets[5] = offsetof(fr_t, w);
+    mpi_fr_offsets[6] = offsetof(fr_t, h);
+
+    MPI_Type_create_struct(mpi_fr_numitems, mpi_fr_blocklengths, mpi_fr_offsets, mpi_fr_types, &mpi_fr_t);
+    MPI_Type_commit(&mpi_fr_t);
+
+
     if (IS_HEAD) {
 
         fr.cX = .2821;
         fr.cY = .01;
-        fr.Z = 50;
-        fr.max_iter = 1000;
-        fr.w = 800;
-        fr.h = 600;
-        fr.h_off = 0;
+        fr.Z = 1;
+        fr.max_iter = 20;
+        fr.w = 640;
+        fr.h = 480;
+        //fr.h_off = 0;
 
         mandelbrot_render(&argc, argv);
         /*
@@ -122,7 +145,7 @@ int main(int argc, char ** argv) {
         */
 
     } else {
-
+        start_compute();
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
@@ -133,7 +156,7 @@ int main(int argc, char ** argv) {
 
 void start_render() {
 
-    int sizeeach_compute = rowseach_compute * fr.w;
+    /*int sizeeach_compute = rowseach_compute * fr.w;
     fr_t * compute_nodes = (fr_t * )malloc(sizeof(fr_t) * compute_size);
     double ** compute_nodes_out = (double **)malloc(sizeof(double *) * compute_size);
     int i;
@@ -146,10 +169,42 @@ void start_render() {
         compute_nodes_out[i] = (double *)malloc(sizeof(double) * sizeeach_compute);
     }
 
-
+*/
 }
 
 
 void start_compute() {
+    fr.w = 640;
+    fr.h = 480;
+    fr.cX = .2821;
+    fr.cY = .01;
+    fr.Z = 1.0;
+    fr.max_iter = 10;
 
+    fr_t fr_last;
+
+    fr_last = fr;
+
+    bool has_ran = false;
+
+    unsigned char * pixels = NULL;
+
+    while (true) {
+        printf("calling recv...\n");
+        MPI_Bcast(&fr, 1, mpi_fr_t, 0, MPI_COMM_WORLD);
+        //MPI_Bcast(&fr.Z, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        printf("recv zoom: %lf\n", fr.Z);
+        if (pixels == NULL || !has_ran || fr_last.w != fr.w || fr_last.h != fr.h) {
+            if (pixels != NULL) {
+                free(pixels);
+            }
+            pixels = (unsigned char *)malloc(4 * fr.w * fr.h);
+        }
+
+        mand_c(fr.w, fr.h, fr.cX, fr.cY, fr.Z, fr.max_iter, pixels);
+        MPI_Send(pixels, 4 * fr.w * fr.h, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
+
+        fr_last = fr;
+        has_ran = true;
+    }
 }

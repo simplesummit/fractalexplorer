@@ -2,6 +2,10 @@
 #include "mandelbrot.h"
 #include "mandelbrot_util.h"
 
+
+
+
+
 unsigned int setup_shader(const char *fname) {
 	FILE *fp;
 	unsigned int prog, sdr, len;
