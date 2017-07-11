@@ -1,4 +1,6 @@
 *.o
+*.so
+*.cuo
 *.pyc
 *.out
 *.tar*

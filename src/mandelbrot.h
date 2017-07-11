@@ -11,22 +11,18 @@
 #include <string.h>
 #include <stdbool.h>
 
+#include <mpi.h>
+
 #include <time.h>
 #include <sys/time.h>
 #include <getopt.h>
 
-#include <mpi.h>
 
 #include "log.h"
+#include "mandelbrot_util.h"
 
-typedef struct fr_t {
-  double cX, cY, Z;
-  
-  // this is a slice of a bigger image, which begins at h_off.
-  // h is very small, as it is split horizontally
-  int max_iter, w, h;
+#include "fr.h"
 
-} fr_t;
 
 // result from worker
 typedef struct fr_wr_t {
@@ -54,13 +50,23 @@ typedef struct mandelbrot_argp_t {
 
 
 #define mpi_fr_numitems (6)
-MPI_Datatype mpi_fr_t;
+/*MPI_Datatype mpi_fr_t;
 int mpi_fr_blocklengths[mpi_fr_numitems];
 MPI_Datatype mpi_fr_types[mpi_fr_numitems];
 MPI_Aint mpi_fr_offsets[mpi_fr_numitems];
-
+*/
 
 fr_t fr;
+fr_col_t col;
+MPI_Datatype mpi_fr_t;
+
+
+int world_size, world_rank;
+#define IS_HEAD (world_rank == 0)
+#define IS_COMPUTE (world_rank > 0)
+
+#define compute_size (world_size - 1)
+#define compute_rank (world_rank - 1)
 
 
 

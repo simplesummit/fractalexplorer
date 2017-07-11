@@ -2,10 +2,12 @@
 
 
 
-
+#include <mpi.h>
 #include "mandelbrot.h"
 #include "mandelbrot_render.h"
 #include "mandelbrot_calc_c.h"
+#include "mandelbrot_calc_cuda.h"
+#include "color.h"
 
 int world_size, world_rank;
 
@@ -18,22 +20,31 @@ int mpi_fr_blocklengths[mpi_fr_numitems] = { 1, 1, 1, 1, 1, 1 };
 MPI_Datatype mpi_fr_types[mpi_fr_numitems] = { MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_INT, MPI_INT, MPI_INT };
 MPI_Aint mpi_fr_offsets[mpi_fr_numitems];
 
+fr_col_t col;
+
 
 #define M_EXIT(n) MPI_Finalize(); exit(0);
 
 #define GETOPT_STOP ((char)-1)
 
-#define IS_HEAD (world_rank == 0)
-#define IS_COMPUTE (world_rank > 0)
+#define E_C  (0x101)
+#define E_CUDA (0x102)
 
-#define compute_size (world_size - 1)
-#define compute_rank (world_rank - 1)
+int engine = E_CUDA;
 
+char * csch = "green";
 
 void mandelbrot_show_help() {
     printf("Usage: mandelbrot [-h]\n");
     printf("  -h             show this help menu\n");
-    printf("  -v[N]             show this help menu\n");
+    printf("  -v[N]          set verbosity (1...5)\n");
+    printf("  -N[N]          set width\n");
+    printf("  -M[N]          set height\n");
+    printf("  -i[N]          set iterations\n");
+    printf("  -x[F]          set center x\n");
+    printf("  -y[F]          set center y\n");
+    printf("  -z[F]          set zoom\n");
+    printf("  -c[S]          set scheme\n");
     printf("\n");
     printf("Questions? Issues? Please contact:\n");
     printf("<brownce@ornl.gov>\n");
@@ -42,7 +53,7 @@ void mandelbrot_show_help() {
 // returns exit code, or -1 if we shouldn't exit
 int parse_args(int argc, char ** argv) {
     char c;
-    while ((c = getopt(argc, argv, "v:h")) != GETOPT_STOP) {
+    while ((c = getopt(argc, argv, "v:N:M:i:x:y:z:c:h")) != GETOPT_STOP) {
 	switch (c) {
             case 'h':
 		mandelbrot_show_help();
@@ -50,6 +61,27 @@ int parse_args(int argc, char ** argv) {
 		break;
             case 'v':
                 log_set_level(atoi(optarg));
+                break;
+            case 'N':
+                fr.w = atoi(optarg);
+                break;
+            case 'M':
+                fr.h = atoi(optarg);
+                break;
+            case 'i':
+                fr.max_iter = atoi(optarg);
+                break;
+            case 'x':
+                fr.cX = atof(optarg);
+                break;
+            case 'y':
+                fr.cY = atof(optarg);
+                break;
+            case 'z':
+                fr.Z = atof(optarg);
+                break;
+            case 'c':
+                csch = optarg;
                 break;
             case '?':
 		printf("Unknown argument: -%c\n", optopt);
@@ -74,13 +106,24 @@ int main(int argc, char ** argv) {
 
     MPI_Get_processor_name(processor_name, &processor_name_len);
 
-    int res = -100;
+    int res = -100, loglvl;
+
+    fr.cX = .2821;
+    fr.cY = .01;
+    fr.Z = 1;
+    fr.max_iter = 20;
+    fr.w = 640;
+    fr.h = 480;
 
     if (IS_HEAD) {
         res = parse_args(argc, argv);
+        loglvl = log_get_level();
     }
 
     MPI_Bcast(&res, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&loglvl, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+    log_set_level(loglvl);
 
     if (res >= 0) {
         M_EXIT(res);
@@ -101,22 +144,33 @@ int main(int argc, char ** argv) {
     mpi_fr_offsets[0] = offsetof(fr_t, cX);
     mpi_fr_offsets[1] = offsetof(fr_t, cY);
     mpi_fr_offsets[2] = offsetof(fr_t, Z);
-    mpi_fr_offsets[4] = offsetof(fr_t, max_iter);
-    mpi_fr_offsets[5] = offsetof(fr_t, w);
-    mpi_fr_offsets[6] = offsetof(fr_t, h);
+    mpi_fr_offsets[3] = offsetof(fr_t, max_iter);
+    mpi_fr_offsets[4] = offsetof(fr_t, w);
+    mpi_fr_offsets[5] = offsetof(fr_t, h);
 
     MPI_Type_create_struct(mpi_fr_numitems, mpi_fr_blocklengths, mpi_fr_offsets, mpi_fr_types, &mpi_fr_t);
     MPI_Type_commit(&mpi_fr_t);
 
+    if (IS_HEAD) {
+        col.num = 10;
+        col.col = (unsigned char *)malloc(4 * col.num);
+        setcol(col, csch);
+    }
+
+    MPI_Bcast(&col.num, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    if (IS_COMPUTE) {
+        col.col = (unsigned char *)malloc(4 * col.num);
+    }
+    
+    log_debug("setting chars, num: %d", col.num);
+    MPI_Bcast(col.col, col.num * 4, MPI_UNSIGNED_CHAR, 0, MPI_COMM_WORLD);
+    log_debug("after chars");
+
+
+    MPI_Bcast(&fr, 1, mpi_fr_t, 0, MPI_COMM_WORLD);
 
     if (IS_HEAD) {
 
-        fr.cX = .2821;
-        fr.cY = .01;
-        fr.Z = 1;
-        fr.max_iter = 20;
-        fr.w = 640;
-        fr.h = 480;
         //fr.h_off = 0;
 
         mandelbrot_render(&argc, argv);
@@ -174,12 +228,7 @@ void start_render() {
 
 
 void start_compute() {
-    fr.w = 640;
-    fr.h = 480;
-    fr.cX = .2821;
-    fr.cY = .01;
-    fr.Z = 1.0;
-    fr.max_iter = 10;
+    log_debug("starting compute");
 
     fr_t fr_last;
 
@@ -189,20 +238,54 @@ void start_compute() {
 
     unsigned char * pixels = NULL;
 
+    int my_h, my_off;
+
+    tperf_t tp_sc, tp_ms;
+    if (engine == E_C) {
+        log_debug("engine C");
+        mand_c_init();
+    } else if (engine == E_CUDA) {
+        log_debug("engine CUDA");
+        mand_cuda_init(col);
+    } else {
+        log_error("Unknown engine");
+    }
+
     while (true) {
-        printf("calling recv...\n");
         MPI_Bcast(&fr, 1, mpi_fr_t, 0, MPI_COMM_WORLD);
+        if (fr.h % compute_size != 0) {
+            log_fatal("bad height and compute size");
+            M_EXIT(2);
+        }
+        
+        my_h = fr.h / compute_size;
+        my_off = compute_rank * fr.h / compute_size;
         //MPI_Bcast(&fr.Z, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        printf("recv zoom: %lf\n", fr.Z);
         if (pixels == NULL || !has_ran || fr_last.w != fr.w || fr_last.h != fr.h) {
             if (pixels != NULL) {
                 free(pixels);
             }
-            pixels = (unsigned char *)malloc(4 * fr.w * fr.h);
+            pixels = (unsigned char *)malloc(4 * fr.w * my_h);
         }
+        C_TIME(tp_sc,
+            if (engine == E_C) {
+                mand_c(fr.w, fr.h, my_h, my_off, fr.cX, fr.cY, fr.Z, fr.max_iter, pixels);
+            } else if (engine == E_CUDA) {
+                mand_cuda(fr, my_h, my_off, pixels);
+            } else {
+                log_error("Unknown engine");
+            }
+            // scan line
+            scanline(pixels, fr.w, 0);
+        )
 
-        mand_c(fr.w, fr.h, fr.cX, fr.cY, fr.Z, fr.max_iter, pixels);
-        MPI_Send(pixels, 4 * fr.w * fr.h, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
+        log_debug("computation fps: %lf", 1.0 / tp_sc.elapsed_s);
+        
+        C_TIME(tp_ms,
+        log_trace("sending pixels back");
+        MPI_Send(pixels, 4 * fr.w * my_h, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
+        )
+        
 
         fr_last = fr;
         has_ran = true;

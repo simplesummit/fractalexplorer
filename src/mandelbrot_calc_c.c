@@ -4,16 +4,23 @@
 #include "mandelbrot_calc_c.h"
 #include "math.h"
 
+
+void mand_c_init() {
+    // do nothing
+}
+
+
 // calculates iterations
-void mand_c(int w, int h, double cX, double cY, double Z, int max_iter, unsigned char * output) {
-    int px, py, ci, ri;
-    double c_r, _c_i, c_i, z_r, z_i, z_r2, z_i2, fri, dppx, tmp;
+void mand_c(int w, int h, int my_h, int my_off, double cX, double cY, double Z, int max_iter, unsigned char * output) {
+    int px, py, ci, ri, c0, c1;
+    double c_r, _c_i, c_i, z_r, z_i, z_r2, z_i2, fri, mfact, dppx;
     _c_i = cY + h / (w * Z);
     c_r = cX - 1.0 / Z;
     dppx = 2.0 / (w * Z);
+    _c_i -= dppx * my_off;
     for (px = 0; px < w; ++px) {
         c_i = _c_i;
-        for (py = 0; py < h; ++py) {
+        for (py = 0; py < my_h; ++py) {
             ri = 4 * (px + py * w);
             z_r = c_r;
             z_i = c_i;
@@ -30,10 +37,17 @@ void mand_c(int w, int h, double cX, double cY, double Z, int max_iter, unsigned
             } else {
                 fri = 2.0 + ci - log(log(z_r2 + z_i2)) / log(2.0);
             }
-            output[ri + 0] = (int)floor(255 * (sin(fri) + 1) / 2);
-            output[ri + 1] = (int)floor(255 * (sin(fri) + 1) / 2);
-            output[ri + 2] = 0;
-            output[ri + 3] = 255;
+            mfact = fri - floor(fri);
+            c0 = (int)floor(fri) % col.num;
+            c1 = (c0 + 1) % col.num;
+
+            c0 *= 4; c1 *= 4;
+            #define MIX(a, b, F) ((b) * (F) + (a) * (1 - (F)))
+
+            output[ri + 0] = (int)floor(MIX(col.col[c0 + 0], col.col[c1 + 0], mfact));
+            output[ri + 1] = (int)floor(MIX(col.col[c0 + 1], col.col[c1 + 1], mfact));
+            output[ri + 2] = (int)floor(MIX(col.col[c0 + 2], col.col[c1 + 2], mfact));
+            output[ri + 3] = (int)floor(MIX(col.col[c0 + 3], col.col[c1 + 3], mfact));
             c_i -= dppx;
         }
     c_r += dppx;
