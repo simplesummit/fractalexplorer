@@ -145,10 +145,16 @@ void key_handler(unsigned char key, int x, int y) {
     log_trace("key '%c' pressed at %d,%d", key, x, y);
 }
 
+
 void motion_handler(int x, int y) {
     bool do_refresh = true;
     if (last_bt == GLUT_RIGHT_BUTTON) {
-        fr.Z *= 1 + ((y - last_y) + (x - last_x)) / (fr.w + fr.h);  
+	double zoomin = 1 + fabs(2.0 * ((y - last_y) + (x - last_x)) / (fr.w + fr.h));
+	if (GLUT_ACTIVE_CTRL) {
+            fr.Z *= zoomin;
+	} else {
+            fr.Z *= zoomin;
+	}  
     } else if(last_bt == GLUT_LEFT_BUTTON) {
         fr.cX = fr.cX - (x - last_x) / (fr.Z * fr.w);
         fr.cY = fr.cY - (y - last_y) / (fr.Z * fr.h);

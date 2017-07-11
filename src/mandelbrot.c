@@ -45,6 +45,8 @@ void mandelbrot_show_help() {
     printf("  -y[F]          set center y\n");
     printf("  -z[F]          set zoom\n");
     printf("  -c[S]          set scheme\n");
+    printf("  -k[N]          set number of colors\n");
+    printf("  -e[S]          set engine\n");
     printf("\n");
     printf("Questions? Issues? Please contact:\n");
     printf("<brownce@ornl.gov>\n");
@@ -53,7 +55,7 @@ void mandelbrot_show_help() {
 // returns exit code, or -1 if we shouldn't exit
 int parse_args(int argc, char ** argv) {
     char c;
-    while ((c = getopt(argc, argv, "v:N:M:i:x:y:z:c:h")) != GETOPT_STOP) {
+    while ((c = getopt(argc, argv, "v:N:M:i:e:k:x:y:z:c:h")) != GETOPT_STOP) {
 	switch (c) {
             case 'h':
 		mandelbrot_show_help();
@@ -82,6 +84,20 @@ int parse_args(int argc, char ** argv) {
                 break;
             case 'c':
                 csch = optarg;
+                break;
+            case 'k':
+                col.num = atoi(optarg);
+                break;
+            case 'e':
+#define SEQ(a, b) (strcmp(a, b) == 0)
+                if (SEQ(optarg, "c")) {
+                    engine = E_C;
+                } else if (SEQ(optarg, "cuda")) {
+                    engine = E_CUDA;
+                } else {
+                    printf("Error: Unkown engine '%s'\n", optarg);
+                    return 1;
+                }
                 break;
             case '?':
 		printf("Unknown argument: -%c\n", optopt);
@@ -115,11 +131,14 @@ int main(int argc, char ** argv) {
     fr.w = 640;
     fr.h = 480;
 
+    col.num = 20;
+
     if (IS_HEAD) {
         res = parse_args(argc, argv);
         loglvl = log_get_level();
     }
 
+    MPI_Bcast(&engine, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&res, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&loglvl, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
@@ -152,7 +171,6 @@ int main(int argc, char ** argv) {
     MPI_Type_commit(&mpi_fr_t);
 
     if (IS_HEAD) {
-        col.num = 10;
         col.col = (unsigned char *)malloc(4 * col.num);
         setcol(col, csch);
     }

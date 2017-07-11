@@ -9,6 +9,8 @@ void mandelbrot_render(int * argc, char ** argv);
 
 void mouse_handler(int button, int state, int x, int y);
 
+void window_refresh(int w, int h);
+
 void motion_handler(int x, int y);
 
 void draw();

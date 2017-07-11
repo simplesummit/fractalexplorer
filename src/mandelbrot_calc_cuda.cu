@@ -79,7 +79,6 @@ void mand_cuda(fr_t fr, int my_h, int my_off, unsigned char * output) {
     dim3 dimBlock(4, 4);
     dim3 dimGrid(fr.w / 4, my_h / 4);
 
-    printf("my_h: %d\n", my_h);
 
     if (lw != fr.w || lh != my_h) {
         if (_gpu_output != NULL) {
