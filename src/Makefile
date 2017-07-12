@@ -9,7 +9,7 @@ NVCC_CFLAGS=-I. -I/usr/local/cuda/include/ -Xcompiler -O3 -Xcompiler -fPIC -m64 
 NVCC_LDFLAGS=
 
 CFLAGS=-std=c99 -Werror -Wall --pedantic -ffast-math -O3 -I. $(shell sdl2-config --cflags)
-LDFLAGS=$(shell sdl2-config --libs) -L/usr/local/cuda/lib64 -L/usr/local/cuda/lib -Wl,-rpath,/usr/local/cuda/lib -lmpi -lSDL2 -lm
+LDFLAGS=$(shell sdl2-config --libs) -L/usr/local/cuda/lib64 -L/usr/local/cuda/lib -Wl,-rpath,/usr/local/cuda/lib -llz4 -lmpi -lSDL2 -lm
 
 mandelbrot_src = mandelbrot.o mandelbrot_render.o mandelbrot_calc_c.o color.o log.o
 

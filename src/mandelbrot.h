@@ -17,6 +17,7 @@
 #include <sys/time.h>
 #include <getopt.h>
 
+bool use_fullscreen;
 
 #include "log.h"
 
@@ -60,6 +61,7 @@ typedef struct mandelbrot_argp_t {
 
 
 #define mpi_fr_numitems (8)
+
 /*MPI_Datatype mpi_fr_t;
 int mpi_fr_blocklengths[mpi_fr_numitems];
 MPI_Datatype mpi_fr_types[mpi_fr_numitems];

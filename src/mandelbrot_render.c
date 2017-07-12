@@ -4,6 +4,8 @@
 #include "mandelbrot_calc_c.h"
 #include "mandelbrot_render.h"
 
+#include <lz4.h>
+
 #include <mpi.h>
 
 #include <math.h>
@@ -55,8 +57,9 @@ unsigned int hash_fr(fr_t fr) {
 void gather_picture() {
     tperf_t tp_bc, tp_rv;
     int i, pe = fr.h / fr.num_workers;
-    unsigned char * naddr;
-    int nbytes;
+    unsigned char * naddr, * cmp_bytes = (unsigned char *)malloc(LZ4_compressBound(fr.mem_w * pe)); 
+    int nbytes, cmp_nbytes;
+
     C_TIME(tp_bc,
     MPI_Bcast(&fr, 1, mpi_fr_t, 0, MPI_COMM_WORLD);
     )
@@ -64,8 +67,14 @@ void gather_picture() {
     for (i = 1; i <= fr.num_workers; ++i) {
         naddr = pixels + pe * fr.mem_w * (i - 1);
         nbytes = fr.mem_w * pe;
-        log_trace("recv from %d, (naddr-pixels): %d, size: %d", i, (int)(naddr-pixels), nbytes);
-        MPI_Recv(naddr, nbytes, MPI_UNSIGNED_CHAR, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+        MPI_Recv(&cmp_nbytes, 1, MPI_INT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        log_trace("recv from %d (compressed), size: %d", i, cmp_nbytes);
+        cmp_bytes = (unsigned char *)malloc(cmp_nbytes);
+        MPI_Recv(cmp_bytes, cmp_nbytes, MPI_UNSIGNED_CHAR, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+        LZ4_decompress_safe((char *)cmp_bytes, (char*)naddr, cmp_nbytes, nbytes);        
+        log_trace("%%%lf of final size (worker %d)", 100.0 * cmp_nbytes / nbytes, i);
     }
     )
     memcpy(surface->pixels, pixels, fr.mem_w * fr.h);
@@ -133,14 +142,16 @@ void mandelbrot_render(int * argc, char ** argv) {
     atexit(SDL_Quit);
 
     window = SDL_CreateWindow("Mandelbrot Render", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, fr.w, fr.h, 0);
-    //SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP); // SDL_WINDOW_FULLSCREEN_DESKTOP, or SDL_WINDOW_FULLSCREEN
-
+    if (fr.w == 0 || fr.h == 0 || use_fullscreen) {
+        SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP); // SDL_WINDOW_FULLSCREEN_DESKTOP, or SDL_WINDOW_FULLSCREEN
+    }
     // in case fullscreen changes it
     SDL_GetWindowSize(window, &fr.w, &fr.h);
 
     screen = SDL_GetWindowSurface(window);
 
     surface = SDL_CreateRGBSurface(SDL_SWSURFACE, fr.w, fr.h, 32, 0xFF, 0xFF00, 0xFF0000, 0xFF000000);
+
 
     if (surface == NULL) {
         log_error("SDL failed to create surface: %s", SDL_GetError());
@@ -235,6 +246,16 @@ void mandelbrot_render(int * argc, char ** argv) {
                         } else if (cevent.key.keysym.sym == SDLK_ESCAPE) {
                             keep_going = false;
                             inner_keep_going = false;
+                        } else if (cevent.key.keysym.sym == 'k') {
+                            if (fr.num_workers < compute_size) {
+			        fr.num_workers++;
+                                update = true;
+                            }
+                        } else if (cevent.key.keysym.sym == 'j') {
+                            if (fr.num_workers > 1) {
+			        fr.num_workers--;
+                                update = true;
+                            }
                         }
                         break;
                     case SDL_MOUSEMOTION:
@@ -301,63 +322,6 @@ void draw() {
 
     SDL_HNDL(SDL_UpdateWindowSurface(window));
 
-    /*
-    C_TIME(tperf_render,
-    glDrawPixels(fr.w, fr.h, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, pixels);
-    glutSwapBuffers();
-    );
-    double fps = 1.0 / tperf_render.elapsed_s;
-    if (fps < 15) {
-        log_warn("draw() fps is low: %lf", fps);
-    }*/
-    //log_trace("draw() fps: %lf", fps);
-}
-/*
-void async_draw(int te) {
-    glutPostRedisplay();
-
-    glutTimerFunc( 10, async_draw, 1);
 }
 
-void idle_handler() {
-    glutPostRedisplay();
-}
 
-void key_handler(unsigned char key, int x, int y) {
-    log_trace("key '%c' pressed at %d,%d", key, x, y);
-}*/
-
-/*
-void motion_handler(int x, int y) {
-    bool do_refresh = true;
-    if (last_bt == GLUT_RIGHT_BUTTON) {
-	double zoomin = 1 + fabs(2.0 * ((y - last_y) + (x - last_x)) / (fr.w + fr.h));
-	if (GLUT_ACTIVE_CTRL) {
-            fr.Z *= zoomin;
-	} else {
-            fr.Z *= zoomin;
-	}
-    } else if(last_bt == GLUT_LEFT_BUTTON) {
-        fr.cX = fr.cX - (x - last_x) / (fr.Z * fr.w);
-        fr.cY = fr.cY - (y - last_y) / (fr.Z * fr.h);
-    } else {
-        do_refresh = false;
-    }
-    if (do_refresh) {
-        window_refresh(fr.w, fr.h);
-    }
-    last_x = x; last_y = y;
-
-}
-
-void mouse_handler(int button, int state, int x, int y) {
-    last_bt = button;
-    last_x = x; last_y = y;
-}
-
-void reshape_handler(GLint w, GLint h) {
-    window_refresh(w, h);
-
-}
-
-*/

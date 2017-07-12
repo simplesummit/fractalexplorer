@@ -4,6 +4,7 @@
 #include <mpi.h>
 #include <stdlib.h>
 
+#include "lz4.h"
 #include "fr.h"
 #include <stddef.h>
 #include "mandelbrot.h"
@@ -18,10 +19,13 @@ int world_size, world_rank;
 char processor_name[MPI_MAX_PROCESSOR_NAME];
 int processor_name_len;
 
+bool use_fullscreen = false;
+
 MPI_Datatype mpi_fr_t;
 int mpi_fr_blocklengths[mpi_fr_numitems] = { 1, 1, 1, 1, 1, 1, 1, 1 };
 MPI_Datatype mpi_fr_types[mpi_fr_numitems] = { MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT };
 MPI_Aint mpi_fr_offsets[mpi_fr_numitems];
+
 
 fr_col_t col;
 
@@ -47,6 +51,7 @@ void mandelbrot_show_help() {
     printf("  -v[N]          set verbosity (1...5)\n");
     printf("  -N[N]          set width\n");
     printf("  -M[N]          set height\n");
+    printf("  -F             use fullscreen\n");
     printf("  -i[N]          set iterations\n");
     printf("  -x[F]          set center x\n");
     printf("  -y[F]          set center y\n");
@@ -62,7 +67,7 @@ void mandelbrot_show_help() {
 // returns exit code, or -1 if we shouldn't exit
 int parse_args(int argc, char ** argv) {
     char c;
-    while ((c = getopt(argc, argv, "v:N:M:i:e:k:x:y:z:c:h")) != GETOPT_STOP) {
+    while ((c = getopt(argc, argv, "v:N:M:i:e:k:x:y:z:c:Fh")) != GETOPT_STOP) {
 	switch (c) {
             case 'h':
 		mandelbrot_show_help();
@@ -76,6 +81,9 @@ int parse_args(int argc, char ** argv) {
                 break;
             case 'M':
                 fr.h = atoi(optarg);
+                break;
+            case 'F':
+                use_fullscreen = true;
                 break;
             case 'i':
                 fr.max_iter = atoi(optarg);
@@ -171,6 +179,8 @@ int main(int argc, char ** argv) {
     mpi_fr_offsets[0] = offsetof(fr_t, cX);
     mpi_fr_offsets[1] = offsetof(fr_t, cY);
     mpi_fr_offsets[2] = offsetof(fr_t, Z);
+    //mpi_fr_offsets[3] = offsetof(fr_t, coffset);
+   // mpi_fr_offsets[4] = offsetof(fr_t, cscale);
     mpi_fr_offsets[3] = offsetof(fr_t, max_iter);
     mpi_fr_offsets[4] = offsetof(fr_t, w);
     mpi_fr_offsets[5] = offsetof(fr_t, h);
@@ -255,6 +265,14 @@ void start_render() {
 }
 
 
+int nhsh(char *x, int n) {
+  int sum = 571, i;
+  for (i = 0; i < n; ++i) sum = sum * (x[n] + 3) % (sum / x[n] + 1);
+  return sum;
+}
+
+#include <zlib.h>
+
 void start_compute() {
     log_debug("starting compute");
 
@@ -271,9 +289,13 @@ void start_compute() {
 #endif
 
 
-    unsigned char * pixels = NULL;
+    unsigned char * pixels = NULL, * pixels_cmp = NULL;
 
     int my_h, my_off;
+
+    
+    int cmp_size = 0, max_cmp_size = 0;
+    int lmcs = 0;
 
     tperf_t tp_sc, tp_ms;
     if (engine == E_C) {
@@ -300,16 +322,21 @@ void start_compute() {
             M_EXIT(2);
         }
         */
+        if (compute_rank < fr.num_workers) {
         my_h = fr.h / fr.num_workers;
         my_off = compute_rank * fr.h / fr.num_workers;
+        max_cmp_size = LZ4_compressBound(fr.mem_w * my_h);
         //MPI_Bcast(&fr.Z, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        if (pixels == NULL || !has_ran || fr_last.w != fr.w || fr_last.h != fr.h) {
+        if (pixels == NULL || !has_ran || fr_last.w != fr.w || fr_last.h != fr.h || lmcs != max_cmp_size) {
             if (pixels != NULL) {
                 free(pixels);
             }
+            if (pixels_cmp != NULL) {
+                free(pixels_cmp);
+            }
             pixels = (unsigned char *)malloc(fr.mem_w * my_h);
+            pixels_cmp = (unsigned char *)malloc(max_cmp_size);
         }
-        if (compute_rank < fr.num_workers) {
         C_TIME(tp_sc,
             if (engine == E_C) {
                 log_trace("mand_c starting");
@@ -326,18 +353,24 @@ void start_compute() {
                 log_error("Unknown engine");
             }
             // scan line
-            log_trace("scanline");
+            //log_trace("scanline");
             scanline(pixels, fr.w, 0);
         )
 
         log_debug("computation fps: %lf", 1.0 / tp_sc.elapsed_s);
 
         C_TIME(tp_ms,
-        log_trace("sending pixels back");
-        MPI_Send(pixels, fr.mem_w * my_h, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
+
+        //log_trace("sending pixels back, hash: %d", nhsh(pixels, fr.mem_w * my_h));
+          cmp_size = LZ4_compress_default((char *)pixels, (char *)pixels_cmp, my_h * fr.mem_w, max_cmp_size);     
+          if (cmp_size <= 0) {
+            log_error("error in compression function: %d", cmp_size);
+          }
+          MPI_Send(&cmp_size, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
+	  MPI_Send(pixels_cmp, cmp_size, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
         )
         }
-
+        lmcs = max_cmp_size;
         fr_last = fr;
         has_ran = true;
     }

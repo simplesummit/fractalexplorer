@@ -5,6 +5,8 @@
 
 typedef struct fr_t {
     double cX, cY, Z;
+    
+//    double coffset, cscale;
 
     int max_iter, w, h, mem_w;
 
@@ -15,6 +17,8 @@ typedef struct fr_t {
 
 typedef struct fr_col_t {
     int num;
+
+
     // BGRA ordering
     unsigned char * col;
 } fr_col_t;

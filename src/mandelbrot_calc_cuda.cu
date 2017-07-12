@@ -36,7 +36,7 @@ void mand_cuda_kernel(fr_t fr, int my_h, int my_off, unsigned char * col, int nc
 
     py += my_off;
 
-    double fri, mfact;
+    double fri, mfact, _q;
 
     double c_r = fr.cX - (fr.w - 2 * px) / (fr.Z * fr.w), c_i = fr.cY + (fr.h - 2 * py) / (fr.Z * fr.w);
 
@@ -44,7 +44,15 @@ void mand_cuda_kernel(fr_t fr, int my_h, int my_off, unsigned char * col, int nc
 
     double z_r2 = z_r * z_r, z_i2 = z_i * z_i;
 
-    for (ci = 0; ci < fr.max_iter && z_r2 + z_i2 <= 16.0; ++ci) {
+    _q = (z_r - .25f);
+    _q = _q * _q + z_i2;
+    if (_q * (_q + (z_r - .25f)) < z_i2 / 4.0f) {
+        ci = fr.max_iter;
+    } else {
+        ci = 0;
+    }
+
+    for (; ci < fr.max_iter && z_r2 + z_i2 <= 16.0; ++ci) {
         z_i = 2 * z_r * z_i + c_i;
         z_r = z_r2 - z_i2 + c_r;
         z_r2 = z_r * z_r; z_i2 = z_i * z_i;
@@ -57,6 +65,8 @@ void mand_cuda_kernel(fr_t fr, int my_h, int my_off, unsigned char * col, int nc
     }
 
     mfact = fri - floor(fri);
+    //
+    mfact = 0;
 
     c0 = (int)floor(fri) % ncol;
     c1 = (c0 + 1) % ncol;
