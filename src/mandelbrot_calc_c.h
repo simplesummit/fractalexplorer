@@ -6,6 +6,6 @@
 void mand_c_init();
 
 // calculate image and store it in output
-void mand_c(int w, int h, int my_h, int my_off, double cX, double cY, double Z, int max_iter, unsigned char * output);
+void mand_c(fr_t fr, int my_h, int my_off, unsigned char * output);
 
 #endif

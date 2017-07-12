@@ -1,23 +1,26 @@
 //
 
 
-
 #include <mpi.h>
+#include <stdlib.h>
+
+#include "fr.h"
+#include <stddef.h>
 #include "mandelbrot.h"
 #include "mandelbrot_render.h"
 #include "mandelbrot_calc_c.h"
 #include "mandelbrot_calc_cuda.h"
 #include "color.h"
 
+
 int world_size, world_rank;
 
 char processor_name[MPI_MAX_PROCESSOR_NAME];
 int processor_name_len;
 
-#define mpi_fr_numitems (6)
 MPI_Datatype mpi_fr_t;
-int mpi_fr_blocklengths[mpi_fr_numitems] = { 1, 1, 1, 1, 1, 1 };
-MPI_Datatype mpi_fr_types[mpi_fr_numitems] = { MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_INT, MPI_INT, MPI_INT };
+int mpi_fr_blocklengths[mpi_fr_numitems] = { 1, 1, 1, 1, 1, 1, 1};
+MPI_Datatype mpi_fr_types[mpi_fr_numitems] = { MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_INT, MPI_INT, MPI_INT, MPI_INT };
 MPI_Aint mpi_fr_offsets[mpi_fr_numitems];
 
 fr_col_t col;
@@ -30,7 +33,11 @@ fr_col_t col;
 #define E_C  (0x101)
 #define E_CUDA (0x102)
 
+#ifdef USE_CUDA
 int engine = E_CUDA;
+#else
+int engine = E_C;
+#endif
 
 char * csch = "green";
 
@@ -166,6 +173,7 @@ int main(int argc, char ** argv) {
     mpi_fr_offsets[3] = offsetof(fr_t, max_iter);
     mpi_fr_offsets[4] = offsetof(fr_t, w);
     mpi_fr_offsets[5] = offsetof(fr_t, h);
+    mpi_fr_offsets[6] = offsetof(fr_t, mem_w);
 
     MPI_Type_create_struct(mpi_fr_numitems, mpi_fr_blocklengths, mpi_fr_offsets, mpi_fr_types, &mpi_fr_t);
     MPI_Type_commit(&mpi_fr_t);
@@ -264,7 +272,12 @@ void start_compute() {
         mand_c_init();
     } else if (engine == E_CUDA) {
         log_debug("engine CUDA");
+        #ifdef USE_CUDA
         mand_cuda_init(col);
+        #else
+        log_fatal("wasn't compiled with CUDA support");
+        M_EXIT(1);
+        #endif
     } else {
         log_error("Unknown engine");
     }
@@ -283,13 +296,20 @@ void start_compute() {
             if (pixels != NULL) {
                 free(pixels);
             }
-            pixels = (unsigned char *)malloc(4 * fr.w * my_h);
+            pixels = (unsigned char *)malloc(fr.mem_w * my_h);
         }
+        
         C_TIME(tp_sc,
             if (engine == E_C) {
-                mand_c(fr.w, fr.h, my_h, my_off, fr.cX, fr.cY, fr.Z, fr.max_iter, pixels);
+                mand_c(fr, my_h, my_off, pixels);
+
             } else if (engine == E_CUDA) {
+                #ifdef USE_CUDA
                 mand_cuda(fr, my_h, my_off, pixels);
+                #else
+                log_fatal("wasn't compiled with CUDA support");
+                M_EXIT(1);
+                #endif
             } else {
                 log_error("Unknown engine");
             }
@@ -301,7 +321,7 @@ void start_compute() {
         
         C_TIME(tp_ms,
         log_trace("sending pixels back");
-        MPI_Send(pixels, 4 * fr.w * my_h, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
+        MPI_Send(pixels, fr.mem_w * my_h, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
         )
         
 

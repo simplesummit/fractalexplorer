@@ -19,9 +19,19 @@
 
 
 #include "log.h"
-#include "mandelbrot_util.h"
 
 #include "fr.h"
+
+// time performance
+typedef struct tperf_t {
+    struct timeval stime, etime;
+
+    double elapsed_s;
+
+} tperf_t;
+
+
+#define C_TIME(stor, ST) gettimeofday(&stor.stime, NULL); ST; gettimeofday(&stor.etime, NULL); stor.elapsed_s = (stor.etime.tv_sec - stor.stime.tv_sec) + (stor.etime.tv_usec - stor.stime.tv_usec) / 1000000.0;
 
 
 // result from worker
@@ -49,7 +59,7 @@ typedef struct mandelbrot_argp_t {
 } mandelbrot_argp_t;
 
 
-#define mpi_fr_numitems (6)
+#define mpi_fr_numitems (7)
 /*MPI_Datatype mpi_fr_t;
 int mpi_fr_blocklengths[mpi_fr_numitems];
 MPI_Datatype mpi_fr_types[mpi_fr_numitems];

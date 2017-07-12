@@ -11,28 +11,28 @@ void mand_c_init() {
 
 
 // calculates iterations
-void mand_c(int w, int h, int my_h, int my_off, double cX, double cY, double Z, int max_iter, unsigned char * output) {
+void mand_c(fr_t fr, int my_h, int my_off, unsigned char * output) {
     int px, py, ci, ri, c0, c1;
     double c_r, _c_i, c_i, z_r, z_i, z_r2, z_i2, fri, mfact, dppx;
-    _c_i = cY + h / (w * Z);
-    c_r = cX - 1.0 / Z;
-    dppx = 2.0 / (w * Z);
+    _c_i = fr.cY + fr.h / (fr.w * fr.Z);
+    c_r = fr.cX - 1.0 / fr.Z;
+    dppx = 2.0 / (fr.w * fr.Z);
     _c_i -= dppx * my_off;
-    for (px = 0; px < w; ++px) {
+    for (px = 0; px < fr.w; ++px) {
         c_i = _c_i;
         for (py = 0; py < my_h; ++py) {
-            ri = 4 * (px + py * w);
+            ri = 4 * px + py * fr.mem_w;
             z_r = c_r;
             z_i = c_i;
             z_r2 = z_r * z_r;
             z_i2 = z_i * z_i;
-            for (ci = 0; ci < max_iter && z_r2 + z_i2 < 16.0; ++ci) {
+            for (ci = 0; ci < fr.max_iter && z_r2 + z_i2 < 16.0; ++ci) {
                 z_i = 2 * z_r * z_i + c_i;
                 z_r = z_r2 - z_i2 + c_r;
                 z_r2 = z_r * z_r;
                 z_i2 = z_i * z_i;
             }
-            if (ci == max_iter) {
+            if (ci == fr.max_iter) {
                 fri = 0.0;
             } else {
                 fri = 2.0 + ci - log(log(z_r2 + z_i2)) / log(2.0);
