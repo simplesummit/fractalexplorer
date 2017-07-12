@@ -264,6 +264,13 @@ void start_compute() {
 
     bool has_ran = false;
 
+#ifdef USE_CUDA
+    bool have_cuda = true;
+#else
+    bool have_cuda = false;
+#endif
+
+
     unsigned char * pixels = NULL;
 
     int my_h, my_off;
@@ -280,6 +287,7 @@ void start_compute() {
         log_fatal("wasn't compiled with CUDA support");
         M_EXIT(1);
         #endif
+
     } else {
         log_error("Unknown engine");
     }
@@ -304,16 +312,21 @@ void start_compute() {
         if (compute_rank < fr.num_workers) {
         C_TIME(tp_sc,
             if (engine == E_C) {
+                log_trace("mand_c starting");
                 mand_c(fr, my_h, my_off, pixels);
-
             } else if (engine == E_CUDA) {
-                mand_cuda(fr, my_h, my_off, pixels);
-                log_fatal("wasn't compiled with CUDA support");
-                M_EXIT(1);
+                if (have_cuda) {
+                    log_trace("mand_cuda starting");
+                    mand_cuda(fr, my_h, my_off, pixels);
+                } else {
+                    log_fatal("wasn't compiled with CUDA support");
+                    M_EXIT(1);
+                }
             } else {
                 log_error("Unknown engine");
             }
             // scan line
+            log_trace("scanline");
             scanline(pixels, fr.w, 0);
         )
 

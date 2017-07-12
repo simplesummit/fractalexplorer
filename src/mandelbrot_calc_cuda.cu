@@ -16,7 +16,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line) {
    }
 }
 
-int lw, lh;
+int lw = 0, lh = 0;
 
 int colnum;
 
@@ -29,7 +29,7 @@ void mand_cuda_kernel(fr_t fr, int my_h, int my_off, unsigned char * col, int nc
     int py = (blockIdx.y * blockDim.y) + threadIdx.y;
 
     // these are added as buffers
-    if (px >= fr.w || py < my_h || my_off + py >= fr.h) {
+    if (px >= fr.w || py >= my_h || my_off + py >= fr.h) {
         return;
     }
     int ri = 4 * (py * fr.w + px), ci, c0, c1;
@@ -84,11 +84,11 @@ void mand_cuda(fr_t fr, int my_h, int my_off, unsigned char * output) {
     dim3 dimGrid(fr.w / 4, my_h / 4);
 
 
-    if (lw != fr.w || lh != my_h) {
+    if (lw != fr.mem_w || lh != my_h) {
         if (_gpu_output != NULL) {
             cudaFree(_gpu_output);
         }
-        gpuErrchk(cudaMalloc((void **)&_gpu_output, fr.w * my_h * 4));
+        gpuErrchk(cudaMalloc((void **)&_gpu_output, fr.mem_w * my_h));
     }
 
 
@@ -100,9 +100,9 @@ void mand_cuda(fr_t fr, int my_h, int my_off, unsigned char * output) {
     gpuErrchk(cudaPeekAtLastError());
 
 
-    gpuErrchk(cudaMemcpy(output, _gpu_output, fr.w * my_h * 4, cudaMemcpyDeviceToHost));
+    gpuErrchk(cudaMemcpy(output, _gpu_output, fr.mem_w * my_h, cudaMemcpyDeviceToHost));
 
-    lw = fr.w;
+    lw = fr.mem_w;
     lh = my_h;
 
 }
