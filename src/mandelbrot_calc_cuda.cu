@@ -27,7 +27,11 @@ void mand_cuda_kernel(fr_t fr, int my_h, int my_off, unsigned char * col, int nc
 
     int px = (blockIdx.x * blockDim.x) + threadIdx.x;
     int py = (blockIdx.y * blockDim.y) + threadIdx.y;
-    
+
+    // these are added as buffers
+    if (px >= fr.w || py < my_h || my_off + py >= fr.h) {
+        return;
+    }
     int ri = 4 * (py * fr.w + px), ci, c0, c1;
 
     py += my_off;
@@ -72,7 +76,7 @@ void mand_cuda_kernel(fr_t fr, int my_h, int my_off, unsigned char * col, int nc
 void mand_cuda_init(fr_col_t col) {
     colnum = col.num;
     gpuErrchk(cudaMalloc((void **)&_gpu_col, 4 * colnum));
-    gpuErrchk(cudaMemcpy(_gpu_col, col.col, 4 * colnum, cudaMemcpyHostToDevice)); 
+    gpuErrchk(cudaMemcpy(_gpu_col, col.col, 4 * colnum, cudaMemcpyHostToDevice));
 }
 
 void mand_cuda(fr_t fr, int my_h, int my_off, unsigned char * output) {
@@ -94,7 +98,7 @@ void mand_cuda(fr_t fr, int my_h, int my_off, unsigned char * output) {
 
     gpuErrchk(cudaDeviceSynchronize());
     gpuErrchk(cudaPeekAtLastError());
-    
+
 
     gpuErrchk(cudaMemcpy(output, _gpu_output, fr.w * my_h * 4, cudaMemcpyDeviceToHost));
 
@@ -105,6 +109,3 @@ void mand_cuda(fr_t fr, int my_h, int my_off, unsigned char * output) {
 
 
 }
-
-
-

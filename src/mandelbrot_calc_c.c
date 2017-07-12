@@ -20,7 +20,7 @@ void mand_c(fr_t fr, int my_h, int my_off, unsigned char * output) {
     _c_i -= dppx * my_off;
     for (px = 0; px < fr.w; ++px) {
         c_i = _c_i;
-        for (py = 0; py < my_h; ++py) {
+        for (py = 0; py < my_h && my_off + py < fr.h; ++py) {
             ri = 4 * px + py * fr.mem_w;
             z_r = c_r;
             z_i = c_i;

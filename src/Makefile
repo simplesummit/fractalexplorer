@@ -8,10 +8,10 @@ USE_CUDA = true
 NVCC_CFLAGS=-I. -I/usr/local/cuda/include/ -Xcompiler -O3 -Xcompiler -fPIC -m64 -gencode arch=compute_53,code=sm_53 -gencode arch=compute_60,code=sm_60 -gencode arch=compute_62,code=sm_62 -gencode arch=compute_62,code=compute_62
 NVCC_LDFLAGS=
 
-CFLAGS=-std=c99 -Werror -Wall -ffast-math -O3 -I. $(shell sdl2-config --cflags)
-LDFLAGS=-L/usr/local/cuda/lib64 -lmpi -lSDL2 -lm $(shell sdl2-config --ldflags)
+CFLAGS=-std=c99 -Werror -Wall --pedantic -ffast-math -O3 -I. $(shell sdl2-config --cflags)
+LDFLAGS=$(shell sdl2-config --libs) -L/usr/local/cuda/lib64 -L/usr/local/cuda/lib -Wl,-rpath,/usr/local/cuda/lib -lmpi -lSDL2 -lm
 
-mandelbrot_src = mandelbrot.o mandelbrot_render.o mandelbrot_calc_c.o color.o log.o 
+mandelbrot_src = mandelbrot.o mandelbrot_render.o mandelbrot_calc_c.o color.o log.o
 
 ifeq ($(USE_CUDA), true)
 CFLAGS += -DUSE_CUDA
@@ -29,7 +29,7 @@ default: mandelbrot
 
 
 %.o: %.c %.h
-	$(CC) $(CFLAGS) -c -o $@ $< $(LDFLAGS)
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 mandelbrot: $(mandelbrot_src)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
@@ -37,5 +37,3 @@ mandelbrot: $(mandelbrot_src)
 
 clean:
 	rm -f *.o
-
-

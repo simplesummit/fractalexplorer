@@ -14,6 +14,9 @@
 #define AXIS_MAX 32717.0f
 #define SDL_HNDL(x) res = x; if (res < 0) { log_fatal("While executing %s, SDL error: %s", #x, SDL_GetError()); }
 
+// smashes down x if abs(x) <= e
+#define SMASH(x, e) ((int)floor(((x) <= (e) && (x) >= -(e)) ? (0) : (x)))
+
 
 tperf_t tperf_render;
 
@@ -51,18 +54,17 @@ unsigned int hash_fr(fr_t fr) {
 
 void gather_picture() {
     tperf_t tp_bc, tp_rv;
-    int i, pe = fr.h / compute_size;
+    int i, pe = fr.h / fr.num_workers;
     unsigned char * naddr;
     int nbytes;
     C_TIME(tp_bc,
     MPI_Bcast(&fr, 1, mpi_fr_t, 0, MPI_COMM_WORLD);
     )
     C_TIME(tp_rv,
-    for (i = 1; i <= compute_size; ++i) {
+    for (i = 1; i <= fr.num_workers; ++i) {
         naddr = pixels + pe * fr.mem_w * (i - 1);
         nbytes = fr.mem_w * pe;
-        printf("%d\n", fr.mem_w * pe);
-        log_trace("recv from %d, naddr-pixels: %d, size: %d", i, (int)(naddr-pixels), nbytes);
+        log_trace("recv from %d, (naddr-pixels): %d, size: %d", i, (int)(naddr-pixels), nbytes);
         MPI_Recv(naddr, nbytes, MPI_UNSIGNED_CHAR, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
     )
@@ -92,7 +94,7 @@ void window_refresh() {
     //mand_c(fr.w, fr.h, fr.cX, fr.cY, fr.Z, fr.max_iter, pixels);
 
     draw();
- 
+
     //glTexImage2D(GL_TEXTURE_2D, 0, GL_BGRA, fr.w, fr.h, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, pixels);
     //glutSwapBuffers();
 
@@ -122,7 +124,6 @@ void mandelbrot_render(int * argc, char ** argv) {
         }
     }
 
-
     if (USE_JOYSTICK) {
         log_info("using joystick");
     } else {
@@ -132,6 +133,11 @@ void mandelbrot_render(int * argc, char ** argv) {
     atexit(SDL_Quit);
 
     window = SDL_CreateWindow("Mandelbrot Render", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, fr.w, fr.h, 0);
+    //SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP); // SDL_WINDOW_FULLSCREEN_DESKTOP, or SDL_WINDOW_FULLSCREEN
+
+    // in case fullscreen changes it
+    SDL_GetWindowSize(window, &fr.w, &fr.h);
+
     screen = SDL_GetWindowSurface(window);
 
     surface = SDL_CreateRGBSurface(SDL_SWSURFACE, fr.w, fr.h, 32, 0xFF, 0xFF00, 0xFF0000, 0xFF000000);
@@ -152,40 +158,53 @@ void mandelbrot_render(int * argc, char ** argv) {
 
     bool r_down = false, l_down = false;
     bool s_down = false;
+    int horiz_v = 0, vert_v = 0, zoom_v = 0;
+
+    int last_ticks = SDL_GetTicks();
 
     while (keep_going == true) {
         //log_trace("outer loop");
         update = false;
         inner_keep_going = true;
+        if (USE_JOYSTICK) {
+            update = horiz_v != 0 || vert_v != 0 || zoom_v != 0;
+            if (update) {
+                double scale_allinput = (double)(SDL_GetTicks() - last_ticks) / 1000.0;
+                fr.cX += scale_allinput * horiz_v / (AXIS_MAX * fr.Z);
+                fr.cY -= scale_allinput * vert_v / (AXIS_MAX * fr.Z);
+                double zfact = 1.0 + scale_allinput * abs(zoom_v) / AXIS_MAX;
+                if (zoom_v > 0) {
+                    fr.Z /= zfact;
+                } else if (zoom_v < 0) {
+                    fr.Z *= zfact;
+                }
+                last_ticks = SDL_GetTicks();
+            }
+            /*
+            if (update) {
+                log_trace("diff: %d,%d,%d", horiz_v, vert_v, zoom_v);
+            }
+            */
+        }
+
         while (SDL_PollEvent(&cevent)) {
             if (inner_keep_going) {
-
                 switch (cevent.type) {
+
                     case SDL_JOYAXISMOTION:
-                        if (USE_JOYSTICK) {
-                            log_trace("joystick axis");
-                            if (cevent.jaxis.axis == horiz) {
-                                log_trace("horiz");
-                                fr.cX += .05 * cevent.jaxis.value / (AXIS_MAX * fr.Z);
-                                update = true;
-                            }
-                            if (cevent.jaxis.axis == vert) {
-                                fr.cY -= .05 * cevent.jaxis.value / (AXIS_MAX * fr.Z);
-                                update = true;
-                            }
-                            if (cevent.jaxis.axis == zaxis) {
-                                double zfact = 1.0 + .15 * fabs(cevent.jaxis.value) / AXIS_MAX;
-                                if (cevent.jaxis.value > 0) {
-                                    fr.Z /= zfact;
-                                } else {
-                                    fr.Z *= zfact;
-                                }
-                                update = true;
-                            }
-                             
+                        log_trace("joystick axis");
+                        if (cevent.jaxis.axis == horiz) {
+                            horiz_v = SMASH(cevent.jaxis.value, AXIS_MAX * .05f);
+                        }
+                        if (cevent.jaxis.axis == vert) {
+                            vert_v = SMASH(cevent.jaxis.value, AXIS_MAX * .05f);
+                        }
+                        if (cevent.jaxis.axis == zaxis) {
+                            zoom_v = SMASH(cevent.jaxis.value, AXIS_MAX * .05f);
                         }
                         break;
                     case SDL_QUIT:
+                        log_info("SDL_Quit event");
                         keep_going = false;
                         inner_keep_going = false;
                         break;
@@ -266,6 +285,9 @@ void mandelbrot_render(int * argc, char ** argv) {
         //do_update = false;
     }
 
+    log_info("quitting now");
+    exit(0);
+
     //window_refresh(fr.w, fr.h);
   //  glutMainLoop();
 }
@@ -278,9 +300,9 @@ void draw() {
     //SDL_BlitSurface(surface, NULL, screen, NULL);
 
     SDL_HNDL(SDL_UpdateWindowSurface(window));
-    
+
     /*
-    C_TIME(tperf_render, 
+    C_TIME(tperf_render,
     glDrawPixels(fr.w, fr.h, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, pixels);
     glutSwapBuffers();
     );
@@ -314,7 +336,7 @@ void motion_handler(int x, int y) {
             fr.Z *= zoomin;
 	} else {
             fr.Z *= zoomin;
-	}  
+	}
     } else if(last_bt == GLUT_LEFT_BUTTON) {
         fr.cX = fr.cX - (x - last_x) / (fr.Z * fr.w);
         fr.cY = fr.cY - (y - last_y) / (fr.Z * fr.h);

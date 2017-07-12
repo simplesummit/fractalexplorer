@@ -19,8 +19,8 @@ char processor_name[MPI_MAX_PROCESSOR_NAME];
 int processor_name_len;
 
 MPI_Datatype mpi_fr_t;
-int mpi_fr_blocklengths[mpi_fr_numitems] = { 1, 1, 1, 1, 1, 1, 1};
-MPI_Datatype mpi_fr_types[mpi_fr_numitems] = { MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_INT, MPI_INT, MPI_INT, MPI_INT };
+int mpi_fr_blocklengths[mpi_fr_numitems] = { 1, 1, 1, 1, 1, 1, 1, 1 };
+MPI_Datatype mpi_fr_types[mpi_fr_numitems] = { MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT };
 MPI_Aint mpi_fr_offsets[mpi_fr_numitems];
 
 fr_col_t col;
@@ -143,6 +143,7 @@ int main(int argc, char ** argv) {
     if (IS_HEAD) {
         res = parse_args(argc, argv);
         loglvl = log_get_level();
+        fr.num_workers = compute_size;
     }
 
     MPI_Bcast(&engine, 1, MPI_INT, 0, MPI_COMM_WORLD);
@@ -174,6 +175,7 @@ int main(int argc, char ** argv) {
     mpi_fr_offsets[4] = offsetof(fr_t, w);
     mpi_fr_offsets[5] = offsetof(fr_t, h);
     mpi_fr_offsets[6] = offsetof(fr_t, mem_w);
+    mpi_fr_offsets[7] = offsetof(fr_t, num_workers);
 
     MPI_Type_create_struct(mpi_fr_numitems, mpi_fr_blocklengths, mpi_fr_offsets, mpi_fr_types, &mpi_fr_t);
     MPI_Type_commit(&mpi_fr_t);
@@ -187,7 +189,7 @@ int main(int argc, char ** argv) {
     if (IS_COMPUTE) {
         col.col = (unsigned char *)malloc(4 * col.num);
     }
-    
+
     log_debug("setting chars, num: %d", col.num);
     MPI_Bcast(col.col, col.num * 4, MPI_UNSIGNED_CHAR, 0, MPI_COMM_WORLD);
     log_debug("after chars");
@@ -284,13 +286,14 @@ void start_compute() {
 
     while (true) {
         MPI_Bcast(&fr, 1, mpi_fr_t, 0, MPI_COMM_WORLD);
+        /*
         if (fr.h % compute_size != 0) {
             log_fatal("bad height and compute size");
             M_EXIT(2);
         }
-        
-        my_h = fr.h / compute_size;
-        my_off = compute_rank * fr.h / compute_size;
+        */
+        my_h = fr.h / fr.num_workers;
+        my_off = compute_rank * fr.h / fr.num_workers;
         //MPI_Bcast(&fr.Z, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
         if (pixels == NULL || !has_ran || fr_last.w != fr.w || fr_last.h != fr.h) {
             if (pixels != NULL) {
@@ -298,18 +301,15 @@ void start_compute() {
             }
             pixels = (unsigned char *)malloc(fr.mem_w * my_h);
         }
-        
+        if (compute_rank < fr.num_workers) {
         C_TIME(tp_sc,
             if (engine == E_C) {
                 mand_c(fr, my_h, my_off, pixels);
 
             } else if (engine == E_CUDA) {
-                #ifdef USE_CUDA
                 mand_cuda(fr, my_h, my_off, pixels);
-                #else
                 log_fatal("wasn't compiled with CUDA support");
                 M_EXIT(1);
-                #endif
             } else {
                 log_error("Unknown engine");
             }
@@ -318,12 +318,12 @@ void start_compute() {
         )
 
         log_debug("computation fps: %lf", 1.0 / tp_sc.elapsed_s);
-        
+
         C_TIME(tp_ms,
         log_trace("sending pixels back");
         MPI_Send(pixels, fr.mem_w * my_h, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
         )
-        
+        }
 
         fr_last = fr;
         has_ran = true;
