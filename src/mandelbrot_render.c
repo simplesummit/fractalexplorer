@@ -201,7 +201,6 @@ void mandelbrot_render(int * argc, char ** argv) {
         while (SDL_PollEvent(&cevent)) {
             if (inner_keep_going) {
                 switch (cevent.type) {
-
                     case SDL_JOYAXISMOTION:
                         log_trace("joystick axis");
                         if (cevent.jaxis.axis == horiz) {
@@ -226,7 +225,11 @@ void mandelbrot_render(int * argc, char ** argv) {
                         break;
                     case SDL_KEYDOWN:
                         if (cevent.key.keysym.sym == ' ') {
-                            fr.Z *= 1.5;
+                            if (s_down) {
+                                fr.Z /= 1.5;
+                            } else {
+                                fr.Z *= 1.5;
+                            }
                             update = true;
                         } else if (cevent.key.keysym.sym == SDLK_LSHIFT || cevent.key.keysym.sym == SDLK_RSHIFT) {
                             s_down = true;
@@ -246,16 +249,24 @@ void mandelbrot_render(int * argc, char ** argv) {
                         } else if (cevent.key.keysym.sym == SDLK_ESCAPE) {
                             keep_going = false;
                             inner_keep_going = false;
-                        } else if (cevent.key.keysym.sym == 'k') {
+                        } else if (cevent.key.keysym.sym == 'k' && cevent.key.repeat == 0) {
                             if (fr.num_workers < compute_size) {
-			        fr.num_workers++;
+			                    fr.num_workers++;
                                 update = true;
                             }
-                        } else if (cevent.key.keysym.sym == 'j') {
+                        } else if (cevent.key.keysym.sym == 'j' && cevent.key.repeat == 0) {
                             if (fr.num_workers > 1) {
-			        fr.num_workers--;
+			                    fr.num_workers--;
                                 update = true;
                             }
+                        } else if (cevent.key.keysym.sym == 'm' && cevent.key.repeat == 0) {
+                            fractal_types_idx = (fractal_types_idx + 1) % FR_FRACTAL_NUM;
+                            fr.fractal_type = fractal_types[fractal_types_idx];
+                            update = true;
+                        } else if (cevent.key.keysym.sym == 'n' && cevent.key.repeat == 0) {
+                            fractal_types_idx = (fractal_types_idx - 1 + FR_FRACTAL_NUM) % FR_FRACTAL_NUM;
+                            fr.fractal_type = fractal_types[fractal_types_idx];
+                            update = true;
                         }
                         break;
                     case SDL_MOUSEMOTION:
@@ -293,6 +304,7 @@ void mandelbrot_render(int * argc, char ** argv) {
                         break;
                 }
             }
+            SDL_PumpEvents();
             //inner_do = false;
         }
         if (!keep_going) {

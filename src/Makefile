@@ -19,16 +19,21 @@ LDFLAGS += -lcuda -lcudart -lcudadevrt
 mandelbrot_src += mandelbrot_calc_cuda.cuo
 endif
 
+ifeq ($(DEV), true)
+CFLAGS += -DDEBUG -DDEV
+endif
+
+
 
 
 default: mandelbrot
 	@
 
-%.cuo: %.cu %.h
+%.cuo: %.cu %.h mandelbrot.h fr.h
 	$(NVCC) $(NVCC_CFLAGS) -lib -c -o $@ $< $(NVCC_LDFLAGS)
 
 
-%.o: %.c %.h
+%.o: %.c %.h mandelbrot.h fr.h
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 mandelbrot: $(mandelbrot_src)

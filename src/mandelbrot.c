@@ -13,17 +13,31 @@
 #include "mandelbrot_calc_cuda.h"
 #include "color.h"
 
+#define SEQ(a, b) (strcmp(a, b) == 0)
 
 int world_size, world_rank;
 
 char processor_name[MPI_MAX_PROCESSOR_NAME];
 int processor_name_len;
 
+int fractal_types_idx = 0;
+int fractal_types[FR_FRACTAL_NUM] = { 
+    FR_MANDELBROT, FR_MANDELBROT_3, FR_SIN
+
+#ifdef DEV
+    , FR_TESTING
+#endif
+
+};
+
+
 bool use_fullscreen = false;
 
+#define mpi_fr_numitems (9)
+
 MPI_Datatype mpi_fr_t;
-int mpi_fr_blocklengths[mpi_fr_numitems] = { 1, 1, 1, 1, 1, 1, 1, 1 };
-MPI_Datatype mpi_fr_types[mpi_fr_numitems] = { MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT };
+int mpi_fr_blocklengths[mpi_fr_numitems] = { 1, 1, 1, 1, 1, 1, 1, 1, 1 };
+MPI_Datatype mpi_fr_types[mpi_fr_numitems] = { MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT };
 MPI_Aint mpi_fr_offsets[mpi_fr_numitems];
 
 
@@ -69,60 +83,59 @@ int parse_args(int argc, char ** argv) {
     char c;
     while ((c = getopt(argc, argv, "v:N:M:i:e:k:x:y:z:c:Fh")) != GETOPT_STOP) {
 	switch (c) {
-            case 'h':
-		mandelbrot_show_help();
-		return 0;
-		break;
-            case 'v':
-                log_set_level(atoi(optarg));
-                break;
-            case 'N':
-                fr.w = atoi(optarg);
-                break;
-            case 'M':
-                fr.h = atoi(optarg);
-                break;
-            case 'F':
-                use_fullscreen = true;
-                break;
-            case 'i':
-                fr.max_iter = atoi(optarg);
-                break;
-            case 'x':
-                fr.cX = atof(optarg);
-                break;
-            case 'y':
-                fr.cY = atof(optarg);
-                break;
-            case 'z':
-                fr.Z = atof(optarg);
-                break;
-            case 'c':
-                csch = optarg;
-                break;
-            case 'k':
-                col.num = atoi(optarg);
-                break;
-            case 'e':
-#define SEQ(a, b) (strcmp(a, b) == 0)
-                if (SEQ(optarg, "c")) {
-                    engine = E_C;
-                } else if (SEQ(optarg, "cuda")) {
-                    engine = E_CUDA;
-                } else {
-                    printf("Error: Unkown engine '%s'\n", optarg);
-                    return 1;
-                }
-                break;
-            case '?':
-		printf("Unknown argument: -%c\n", optopt);
-		return 1;
-		break;
-            default:
-		printf("ERROR: unknown getopt return val\n");
-		return 1;
-                break;
-	}
+        case 'h':
+		    mandelbrot_show_help();
+		    return 0;
+		    break;
+        case 'v':
+            log_set_level(atoi(optarg));
+            break;
+        case 'N':
+            fr.w = atoi(optarg);
+            break;
+        case 'M':
+            fr.h = atoi(optarg);
+            break;
+        case 'F':
+            use_fullscreen = true;
+            break;
+        case 'i':
+            fr.max_iter = atoi(optarg);
+            break;
+        case 'x':
+            fr.cX = atof(optarg);
+            break;
+        case 'y':
+            fr.cY = atof(optarg);
+            break;
+        case 'z':
+            fr.Z = atof(optarg);
+            break;
+        case 'c':
+            csch = optarg;
+            break;
+        case 'k':
+            col.num = atoi(optarg);
+            break;
+        case 'e':
+            if (SEQ(optarg, "c")) {
+                engine = E_C;
+            } else if (SEQ(optarg, "cuda")) {
+                engine = E_CUDA;
+            } else {
+                printf("Error: Unkown engine '%s'\n", optarg);
+                return 1;
+            }
+            break;
+        case '?':
+            printf("Unknown argument: -%c\n", optopt);
+            return 1;
+		    break;
+        default:
+		    printf("ERROR: unknown getopt return val\n");
+		    return 1;
+            break;
+	    }
     }
     return -1;
 }
@@ -145,6 +158,7 @@ int main(int argc, char ** argv) {
     fr.max_iter = 20;
     fr.w = 640;
     fr.h = 480;
+    fr.fractal_type = FR_MANDELBROT;
 
     col.num = 20;
 
@@ -185,7 +199,8 @@ int main(int argc, char ** argv) {
     mpi_fr_offsets[4] = offsetof(fr_t, w);
     mpi_fr_offsets[5] = offsetof(fr_t, h);
     mpi_fr_offsets[6] = offsetof(fr_t, mem_w);
-    mpi_fr_offsets[7] = offsetof(fr_t, num_workers);
+    mpi_fr_offsets[7] = offsetof(fr_t, fractal_type);
+    mpi_fr_offsets[8] = offsetof(fr_t, num_workers);
 
     MPI_Type_create_struct(mpi_fr_numitems, mpi_fr_blocklengths, mpi_fr_offsets, mpi_fr_types, &mpi_fr_t);
     MPI_Type_commit(&mpi_fr_t);
@@ -271,7 +286,6 @@ int nhsh(char *x, int n) {
   return sum;
 }
 
-#include <zlib.h>
 
 void start_compute() {
     log_debug("starting compute");
@@ -354,7 +368,7 @@ void start_compute() {
             }
             // scan line
             //log_trace("scanline");
-            scanline(pixels, fr.w, 0);
+            //scanline(pixels, fr.w, 0);
         )
 
         log_debug("computation fps: %lf", 1.0 / tp_sc.elapsed_s);

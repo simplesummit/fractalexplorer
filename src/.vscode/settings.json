@@ -1,0 +1,18 @@
+{
+    "files.associations": {
+        "mandelbrot.h": "c",
+        "fr.h": "c",
+        "sdl_rect.h": "c",
+        "sdl_surface.h": "c",
+        "sdl_video.h": "c",
+        "mpi.h": "c",
+        "stdlib.h": "c",
+        "getopt.h": "c",
+        "sdl_events.h": "c",
+        "sdl_touch.h": "c",
+        "sdl_keyboard.h": "c",
+        "sdl_gamecontroller.h": "c",
+        "stdbool.h": "c",
+        "cmath": "c"
+    }
+}

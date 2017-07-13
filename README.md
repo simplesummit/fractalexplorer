@@ -11,6 +11,7 @@ You need:
   * C compiler for MPI (`mpicc`)
   * MPI libraries
   * SDL2
+  * LZ4 (a specific version is required, >= 1.7.0, see `install_jetsonTX2.sh` for a URL)
 
 Optionally, the following are supported:
 
@@ -29,7 +30,17 @@ to build without CUDA support, run:
 
 `make clean && make USE_CUDA=false`
 
+Typically, for development, you will use:
+
+`make DEV=true`
+
 The resulting binary is `./src/mandelbrot`
+
+## Installing
+
+For installing on a Small-Summit machine, run this on each machine (there are normally 8 jetsons):
+
+`sudo ./install_jetsonTX2.sh`
 
 
 ## Running
@@ -41,6 +52,8 @@ To run, use `mpirun`:
 to view help.
 
 
+Run `mpirun -n 6 ./src/mandelbrot -i250 -crandom -F` to do a fullscreen render.
+
 You will need at least 2 threads (1 head and 1 compute), but you can add as many as you'd like.
 
 TODO: Add multi-machine example
@@ -49,6 +62,7 @@ TODO: Add multi-machine example
 ## Bundling
 
 To distribute source, run `make dist-gzip`, you should have `small-summit-demo.tar.gz`
+
 
 
 

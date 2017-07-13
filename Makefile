@@ -1,6 +1,6 @@
 ## Makefile
 
-dist_src = README.md LICENSE Makefile src/Makefile src/*.c src/*.h src/*.cu
+dist_src = README.md LICENSE Makefile src/Makefile src/*.c src/*.h src/*.cu install_jetsonTX2.sh
 
 PROG_NAME = small-summit-demo
 
