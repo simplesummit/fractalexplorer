@@ -87,11 +87,17 @@ typedef struct fr_t {
 } fr_t;
 
 
+
+// holds colors, essentially an array. Most functions require this to be
+// allocatedm which col should be 4 * num bytes. The ordering is RGBA, and A
+// should be 255 most of the time
 typedef struct fr_col_t {
+
+    // how many colors
     int num;
 
 
-    // BGRA ordering
+    // RGBA packed byte array
     unsigned char * col;
 } fr_col_t;
 

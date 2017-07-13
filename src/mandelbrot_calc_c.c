@@ -20,9 +20,14 @@ can also find a copy at http://www.gnu.org/licenses/.
 #include "mandelbrot.h"
 #include "mandelbrot_calc_c.h"
 
+// type generic math macros, which finds the correct function based on input.
+// this slows down compile time at the preprocessing step, and this should be
+// removed and instead use `complex.h` with cabs, csin functions
 #include "tgmath.h"
 
 
+// initialize any buffers, caches, etc here. The C engine can share the memory
+// with the rest 
 void mand_c_init() {
     // do nothing
 }

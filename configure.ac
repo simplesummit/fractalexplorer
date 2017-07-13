@@ -173,6 +173,7 @@ else
 fi
 
 if test "x$with_cuda" = xyes && test x$VALID_CUDA = xyes ; then
+  AC_DEFINE([USE_CUDA], [], [use cuda])
 	AC_MSG_NOTICE([Building with CUDA bindings])
 elif test "x$with_cuda" = xyes && test x$VALID_CUDA = xno ; then
 	AC_MSG_ERROR([Cannot build CUDA bindings. Check errors])
