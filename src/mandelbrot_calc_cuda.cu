@@ -23,64 +23,119 @@ extern "C" {
 #include <stdio.h>
 #include <stdlib.h>
 
+
+typedef
+double
+complex[2];
+
+/* complex function macros */
+
+// sets r to a
+// r can be a
+#define cset(r, a) r[0] = a[0]; r[1] = a[1];
+
+// returns a + b
+// r can be a or b
+#define cadd(r, a, b) r[0] = a[0] + b[0]; r[1] = a[1] + b[1];
+
+// returns a - b
+// r can be a or b
+#define csub(r, a, b) r[0] = a[0] - b[0]; r[1] = a[1] - b[1];
+
+// returns a * b
+// r has to be different variable than a and b
+#define cmul(r, a, b) r[0] = a[0] * b[0] - a[1] * b[1]; r[1] = a[0] * b[1] + a[1] * b[0];
+
+// returns a * a
+// r has to be a different variable than a
+#define csqr(r, a) r[0] = a[0] * a[0] - a[1] * a[1]; r[1] = 2 * a[0] * a[1];
+
+
+// the absolute value of x, squared
+#define cabs2(x) (x[0] * x[0] + x[1] * x[1])
+#define cabs(x) sqrt(cabs2(x))
+
 #include "fr.h"
 
+// a macro to check a result and then print out info if failed, and (possibly)
+// exit
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 
 inline void gpuAssert(cudaError_t code, const char *file, int line) {
    if (code != cudaSuccess) {
-      fprintf(stderr, "GPUassert (at %s:%d): %s\n", file, line, cudaGetErrorString(code));
-      // don't exit, many times it is recoverable
-      //exit(code);
+      fprintf(stderr, "GPUassert (at %s:%d) (code %d): %s\n", file, line, code,
+                      cudaGetErrorString(code));
+
+      // TODO: determine when to exit. Some kernel launch failures seem to be
+      // recoverable
+      // codes: 35 is insufficient driver
+      if (code != 35) {
+          exit(code);
+      }
    }
 }
 
+// last width and height
 int lw = 0, lh = 0;
 
+// number of colors
 int colnum;
 
+// GPU buffers
 unsigned char * _gpu_output = NULL, * _gpu_col = NULL;
 
+
+// a CUDA device kernel to compute fractal pixels value. Takes fr as parameters,
+// my_h and my_off for custom rank based parameters, color and the number of
+// colors, and an output buffer. Note that the buffers should be allocated
+// with CUDA device memory functions
 __global__
 void mand_cuda_kernel(fr_t fr, int my_h, int my_off, unsigned char * col, int ncol, unsigned char * output) {
 
+    // compute the current pixel offset
     int px = (blockIdx.x * blockDim.x) + threadIdx.x;
     int py = (blockIdx.y * blockDim.y) + threadIdx.y;
 
-    // these are added as buffers
+    // it may be desirable to launch a job with more than neccessary dimensions
+    // so, we simply don't run when this is true
     if (px >= fr.w || py >= my_h || my_off + py >= fr.h) {
         return;
     }
-    int ri = 4 * (py * fr.w + px), ci, c0, c1;
 
+    // the return index, current iteration, and color indexes
+    int ri = py * fr.mem_w + 4 * px, ci, c0, c1;
+
+    // the offset is added (as the px and py are 0 based)
     py += my_off;
 
     double fri, mfact, _q;
 
-    double c_r = fr.cX - (fr.w - 2 * px) / (fr.Z * fr.w), c_i = fr.cY + (fr.h - 2 * py) / (fr.Z * fr.w);
+    // real, imaginary
+    complex c = {
+        fr.cX - (fr.w - 2 * px) / (fr.Z * fr.w),
+        fr.cY + (fr.h - 2 * py) / (fr.Z * fr.w)
+    };
 
-    double z_r = c_r, z_i = c_i;
+    complex z;
+    cset(z, c);
+    complex tmp;
 
-    double z_r2 = z_r * z_r, z_i2 = z_i * z_i;
-
-    _q = (z_r - .25f);
-    _q = _q * _q + z_i2;
-    if (_q * (_q + (z_r - .25f)) < z_i2 / 4.0f) {
+    _q = (z[0] - .25f);
+    _q = _q * _q + z[1] * z[1];
+    if (_q * (_q + (z[0] - .25f)) < z[1] * z[1] / 4.0f) {
         ci = fr.max_iter;
     } else {
-        ci = 0;
+        for (ci = 0; ci < fr.max_iter && cabs(c) <= 16.0; ++ci) {
+            csqr(tmp, z);
+            cadd(z, tmp, c);
+        }
     }
 
-    for (; ci < fr.max_iter && z_r2 + z_i2 <= 16.0; ++ci) {
-        z_i = 2 * z_r * z_i + c_i;
-        z_r = z_r2 - z_i2 + c_r;
-        z_r2 = z_r * z_r; z_i2 = z_i * z_i;
-    }
 
     if (ci == fr.max_iter) {
         fri = 0.0;
     } else {
-        fri = 2.0 + ci - log(log(z_r2 + z_i2)) / log(2.0);
+        fri = 2.0 + ci - log(log(cabs2(z))) / log(2.0);
     }
 
     mfact = fri - floor(fri);

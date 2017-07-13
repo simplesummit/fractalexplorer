@@ -84,15 +84,15 @@ void setcol__random(fr_col_t col, int ri, int i, float v) {
     col.col[ri + 3] = 255;
 }
 
-// sets the color to a string (print an error if not found)
-// the memory in col needs to be allocated before calling this
+// sets the color to a string (print an error if not found). the memory in col
+// needs to be allocated before calling this (4 * col.num bytes)
 void setcol(fr_col_t col, char * scheme) {
     srand(time(NULL));
 
-    //col.col = (unsigned char *)malloc(col.num * 4);
-
+    // a function pointer to generate and store a color
     void (*cfnc)(fr_col_t, int, int, float);
 
+    // string equals
     #define SEQ(a, b) (strcmp(a, b) == 0)
     if (SEQ(scheme, "red")) {
         cfnc = &setcol__red;

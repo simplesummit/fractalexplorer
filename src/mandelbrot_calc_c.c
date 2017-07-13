@@ -209,16 +209,28 @@ void mand_c(fr_t fr, int my_h, int my_off, unsigned char * output) {
                 fri = 0.0 + fr.max_iter;
             }
 
+            // TODO: implement scale and offset for function
             //fri = fri * fr.cscale + fr.coffset;
             mfact = fri - floor(fri);
+
+            // TODO: add toggle to do simple or complex coloring, right now we
+            // are just forcing simple
             mfact = 0;
 
+            // convert this to an index
             c0 = (int)floor(fri) % col.num;
+            // the color is mixed by the next in the result index
             c1 = (c0 + 1) % col.num;
 
+            // the offset is 4 times the index
             c0 *= 4; c1 *= 4;
+
+            // a macro to scale between values. when F = 0, MIX macro takes the
+            // value of a, when F = 1.0, the macro takes the value of b, and all
+            // values inbetween are linearly scaled
             #define MIX(a, b, F) ((b) * (F) + (a) * (1 - (F)))
 
+            // set each to the mix between colorscheme values
             output[ri + 0] = (int)floor(MIX(col.col[c0 + 0], col.col[c1 + 0], mfact));
             output[ri + 1] = (int)floor(MIX(col.col[c0 + 1], col.col[c1 + 1], mfact));
             output[ri + 2] = (int)floor(MIX(col.col[c0 + 2], col.col[c1 + 2], mfact));
