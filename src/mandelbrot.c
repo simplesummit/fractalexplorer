@@ -71,11 +71,7 @@ fr_col_t col;
 #define E_C  (0x101)
 #define E_CUDA (0x102)
 
-#ifdef HAVE_CUDA
-int engine = E_CUDA;
-#else
 int engine = E_C;
-#endif
 
 char * csch = "green";
 
