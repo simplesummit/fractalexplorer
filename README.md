@@ -22,17 +22,13 @@ Optionally, the following are supported:
 
 To build, run:
 
-`make`
+`./configure && make`
 
 (this should work on all Jetson TX2 machines)
 
 to build without CUDA support, run:
 
-`make clean && make USE_CUDA=false`
-
-Typically, for development, you will use:
-
-`make DEV=true`
+`./configure --without-cuda`
 
 The resulting binary is `./src/mandelbrot`
 
@@ -61,11 +57,7 @@ TODO: Add multi-machine example
 
 ## Bundling
 
-To distribute source, run `make dist-gzip`, you should have `small-summit-demo.tar.gz`
-
-
-
-
+To distribute source, run `make dist-gzip`, you should have `small-summit-mandelbrot-VERSION.tar.gz`
 
 
 
