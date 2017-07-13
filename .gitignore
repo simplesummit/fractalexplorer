@@ -121,4 +121,6 @@ compileopencl.sh
 *.tif
 .vscode/
 
+*.Po
+
 
