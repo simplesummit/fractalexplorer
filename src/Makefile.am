@@ -30,6 +30,8 @@ mandelbrot_LDFLAGS =
 
 if HAVE_CUDA
 mandelbrot_LDADD += mandelbrot_calc_cuda.o
+mandelbrot_LDFLAGS += -lcuda -lcudart -lcudadevrt
+mandelbrot_LDADD += -lcuda -lcudart -lcudadevrt
 endif
 
 

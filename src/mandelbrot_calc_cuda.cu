@@ -29,7 +29,7 @@ extern "C" {
 
 inline void gpuAssert(cudaError_t code, const char *file, int line) {
    if (code != cudaSuccess) {
-      fprintf(stderr, "GPUassert (at %s:%d): %s\n", cudaGetErrorString(code), file, line);
+      fprintf(stderr, "GPUassert (at %s:%d): %s\n", file, line, cudaGetErrorString(code));
       // don't exit, many times it is recoverable
       //exit(code);
    }

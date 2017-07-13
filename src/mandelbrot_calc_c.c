@@ -73,12 +73,13 @@ void mand_c(fr_t fr, int my_h, int my_off, unsigned char * output) {
                     }
                     fri = 0.0 + ci;
                     break;
-                case FR_TESTING:
+/*                case FR_TESTING:
                     for (ci = 0; ci < fr.max_iter && abs(z) <= 16.0; ++ci) {
                         z = z / c + c;
                     }
                     fri = 0.0 + ci;
                     break;
+*/
                 default:
                     log_error("unknown fractal type");
                     exit(3);
