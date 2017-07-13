@@ -20,6 +20,10 @@ can also find a copy at http://www.gnu.org/licenses/.
 #ifndef __MANDELBROT_H__
 #define __MANDELBROT_H__
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
