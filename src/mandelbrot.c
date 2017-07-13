@@ -71,7 +71,7 @@ fr_col_t col;
 #define E_C  (0x101)
 #define E_CUDA (0x102)
 
-#ifdef USE_CUDA
+#ifdef HAVE_CUDA
 int engine = E_CUDA;
 #else
 int engine = E_C;
@@ -279,7 +279,7 @@ void start_compute() {
 
     bool has_ran = false;
 
-#ifdef USE_CUDA
+#ifdef HAVE_CUDA
     bool have_cuda = true;
 #else
     bool have_cuda = false;
@@ -299,7 +299,7 @@ void start_compute() {
     log_debug("engine C");
     mand_c_init();
 
-    #ifdef USE_CUDA
+    #ifdef HAVE_CUDA
     log_debug("engine CUDA");
     mand_cuda_init(col);
     #else
