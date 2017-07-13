@@ -1,8 +1,4 @@
-/* mandelbrot_calc_cuda.h -- exposes CUDA engine to other files. Specifically,
-                          -- mandelbrot_calc_cuda.cu must be compiled by NVCC
-                          -- and then linked. This header file is neccesary
-                          -- to define unresolved symbols before the final
-                          -- link step
+/* util.c -- implements various utilities
 
   This file is part of the small-summit-fractal project.
 
@@ -21,12 +17,7 @@ can also find a copy at http://www.gnu.org/licenses/.
 
 */
 
-#ifndef __MAND_CUDA_H__
-#define __MAND_CUDA_H__
-
-void mand_cuda_init(fr_col_t col);
-
-void mand_cuda(fr_t fr, int my_h, int my_off, unsigned char * output);
+#include "util.h"
 
 
-#endif
+//

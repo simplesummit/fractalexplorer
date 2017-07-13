@@ -1,4 +1,22 @@
-//
+/* mandelbrot_render.c -- this is ran on the head node, and is responsible for
+                       -- communication and screen rendering
+
+  This file is part of the small-summit-fractal project.
+
+  small-summit-fractal source code, as well as any other resources in this
+project are free software; you are free to redistribute it and/or modify them
+under the terms of the GNU General Public License; either version 3 of the
+license, or any later version.
+
+  These programs are hopefully useful and reliable, but it is understood
+that these are provided WITHOUT ANY WARRANTY, or MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE. See the GPLv3 or email at
+<cade@cade.site> for more info on this.
+
+  Here is a copy of the GPL v3, which this software is licensed under. You
+can also find a copy at http://www.gnu.org/licenses/.
+
+*/
 
 #include "mandelbrot.h"
 #include "mandelbrot_calc_c.h"
@@ -57,7 +75,7 @@ unsigned int hash_fr(fr_t fr) {
 void gather_picture() {
     tperf_t tp_bc, tp_rv;
     int i, pe = fr.h / fr.num_workers;
-    unsigned char * naddr, * cmp_bytes = (unsigned char *)malloc(LZ4_compressBound(fr.mem_w * pe)); 
+    unsigned char * naddr, * cmp_bytes = (unsigned char *)malloc(LZ4_compressBound(fr.mem_w * pe));
     int nbytes, cmp_nbytes;
 
     C_TIME(tp_bc,
@@ -73,7 +91,7 @@ void gather_picture() {
         cmp_bytes = (unsigned char *)malloc(cmp_nbytes);
         MPI_Recv(cmp_bytes, cmp_nbytes, MPI_UNSIGNED_CHAR, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-        LZ4_decompress_safe((char *)cmp_bytes, (char*)naddr, cmp_nbytes, nbytes);        
+        LZ4_decompress_safe((char *)cmp_bytes, (char*)naddr, cmp_nbytes, nbytes);
         log_trace("%%%lf of final size (worker %d)", 100.0 * cmp_nbytes / nbytes, i);
     }
     )
@@ -89,13 +107,14 @@ void window_refresh() {
     }
     tperf_t tp_wr;
     C_TIME(tp_wr,
-    //if (w != fr.w || h != fr.h || pixels == NULL) {
+    if (pixels == NULL) {
         log_debug("remallocing render pixels");
         if (pixels != NULL) {
             //free(pixels);
         }
         pixels = (unsigned char *)malloc(fr.mem_w * fr.h);
-    //}
+        memset(pixels, 0, fr.mem_w * fr.h);
+    }
 
 
     // GET PIXEL DATA HERE
@@ -319,10 +338,8 @@ void mandelbrot_render(int * argc, char ** argv) {
     }
 
     log_info("quitting now");
-    exit(0);
 
-    //window_refresh(fr.w, fr.h);
-  //  glutMainLoop();
+    exit(0);
 }
 
 void draw() {
@@ -335,5 +352,3 @@ void draw() {
     SDL_HNDL(SDL_UpdateWindowSurface(window));
 
 }
-
-

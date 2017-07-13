@@ -3,14 +3,14 @@
 #    This file is part of the small-summit-fractal project
 #
 #    small-summit-fractal source code, as well as any other resources in this
-#  project are free software; you are free to redistribute it and/or modify 
+#  project are free software; you are free to redistribute it and/or modify
 #  them under the terms of the GNU General Public License; either version 3 of
 #  thelicense, or any later version.
 #
 #    These programs are hopefully useful and reliable, but it is understood
 #  that these are provided WITHOUT ANY WARRANTY, or MERCHANTABILITY or FITNESS
 #  FOR A PARTICULAR PURPOSE. See the GPLv3 or email at
-#  <info@chemicaldevelopment.us> for more info on this.
+#  <cade@cade.site> for more info on this.
 #
 #    Here is a copy of the GPL v3, which this software is licensed under. You
 #  can also find a copy at http://www.gnu.org/licenses/.
@@ -23,7 +23,7 @@ AM_LDFLAGS =
 
 bin_PROGRAMS = mandelbrot
 
-mandelbrot_SOURCES = mandelbrot.c mandelbrot.h fr.h color.c color.h log.c log.h mandelbrot_calc_c.c mandelbrot_calc_c.h  mandelbrot_calc_cuda.h mandelbrot_render.h mandelbrot_render.c
+mandelbrot_SOURCES = mandelbrot.c mandelbrot.h fr.h color.c color.h log.c log.h mandelbrot_calc_c.c mandelbrot_calc_c.h  mandelbrot_calc_cuda.h util.c util.h mandelbrot_render.h mandelbrot_render.c
 mandelbrot_LDADD = @SDL_LDFLAGS@
 mandelbrot_CFLAGS = @SDL_CFLAGS@
 mandelbrot_LDFLAGS =
@@ -39,5 +39,3 @@ CUDA_LDFLAGS = @CUDA_LDFLAGS@
 
 mandelbrot_calc_cuda.o: mandelbrot_calc_cuda.cu fr.h
 	$(NVCC) $(CUDA_CFLAGS) $(NVCC_CFLAGS) -Xcompiler -fPIC -I. -I.. -DHAVE_CONFIG_H -m64 $(CUDA_LDFLAGS) -lib -o $@ -c $<
-
-

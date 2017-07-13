@@ -3,14 +3,14 @@
 #    This file is part of the small-summit-fractal project
 #
 #    small-summit-fractal source code, as well as any other resources in this
-#  project are free software; you are free to redistribute it and/or modify 
+#  project are free software; you are free to redistribute it and/or modify
 #  them under the terms of the GNU General Public License; either version 3 of
 #  thelicense, or any later version.
 #
 #    These programs are hopefully useful and reliable, but it is understood
 #  that these are provided WITHOUT ANY WARRANTY, or MERCHANTABILITY or FITNESS
 #  FOR A PARTICULAR PURPOSE. See the GPLv3 or email at
-#  <info@chemicaldevelopment.us> for more info on this.
+#  <cade@cade.site> for more info on this.
 #
 #    Here is a copy of the GPL v3, which this software is licensed under. You
 #  can also find a copy at http://www.gnu.org/licenses/.
@@ -28,6 +28,9 @@ AM_INIT_AUTOMAKE([])
 AC_CONFIG_SRCDIR([src/mandelbrot.h])
 AC_CONFIG_HEADERS([config.h])
 
+if test -z "$CC"; then
+    CC=mpicc
+fi
 
 AC_LANG(C)
 AC_PROG_CC
@@ -150,7 +153,7 @@ if test -x "$cuda_prefix/bin/nvcc"; then
 		CUDA_CFLAGS="$CUDA_CFLAGS -I$cuda_prefix/include/"
 		CFLAGS="$CUDA_CFLAGS $CFLAGS"
 		CUDA_LDFLAGS="-L$CUDA_LIBDIR"
-		LDFLAGS="$CUDA_LDFLAGS $LDFLAGS -Wl,-rpath,$CUDA_LIBDIR"
+		LDFLAGS="$CUDA_LDFLAGS $LDFLAGS -Wl,-rpath,$CUDA_LIBDIR -lcuda -lcudart -lcudadevrt"
 
 		# And the header and the lib
 		AC_CHECK_HEADERS([cuda.h cuda_runtime.h helper_functions.h helper_cuda.h])
@@ -227,6 +230,3 @@ AC_CHECK_SIZEOF([unsigned long])
 # todo, add tests
 AC_CONFIG_FILES([Makefile src/Makefile])
 AC_OUTPUT
-
-
-

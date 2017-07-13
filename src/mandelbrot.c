@@ -1,4 +1,21 @@
-//
+/* mandelbrot.c -- main summit demo file
+
+  This file is part of the small-summit-fractal project.
+
+  small-summit-fractal source code, as well as any other resources in this
+project are free software; you are free to redistribute it and/or modify them
+under the terms of the GNU General Public License; either version 3 of the
+license, or any later version.
+
+  These programs are hopefully useful and reliable, but it is understood
+that these are provided WITHOUT ANY WARRANTY, or MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE. See the GPLv3 or email at
+<cade@cade.site> for more info on this.
+
+  Here is a copy of the GPL v3, which this software is licensed under. You
+can also find a copy at http://www.gnu.org/licenses/.
+
+*/
 
 
 #include <mpi.h>
@@ -21,14 +38,17 @@ char processor_name[MPI_MAX_PROCESSOR_NAME];
 int processor_name_len;
 
 int fractal_types_idx = 0;
-int fractal_types[FR_FRACTAL_NUM] = { 
+int fractal_types[FR_FRACTAL_NUM] = {
     FR_MANDELBROT, FR_MANDELBROT_3, FR_SIN
-
 #ifdef DEV
     , FR_TESTING
 #endif
 
 };
+
+int * gargc;
+
+char *** gargv;
 
 
 bool use_fullscreen = false;
@@ -142,6 +162,9 @@ int parse_args(int argc, char ** argv) {
 
 
 int main(int argc, char ** argv) {
+    gargc = &argc;
+    gargv = &argv;
+
     MPI_Init(&argc, &argv);
 
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
@@ -223,35 +246,10 @@ int main(int argc, char ** argv) {
     MPI_Bcast(&fr, 1, mpi_fr_t, 0, MPI_COMM_WORLD);
 
     if (IS_HEAD) {
-
-        //fr.h_off = 0;
-
-        mandelbrot_render(&argc, argv);
-        /*
-        int rowseach_compute = fr.h / compute_size;
-
-        if (fr.h % compute_size != 0) {
-            printf("fail compute size\n");
-            exit(3);
-        }
-
-        fr_recombo_t fr_recombo;
-        fr_recombo.num_workers = compute_size;
-        fr_recombo.workers = (fr_t *)malloc(sizeof(fr_t) * fr_recombo.num_workers);
-        fr_recombo.idata = (fr_wr_t *)malloc(sizeof(fr_wr_t) * fr_recombo.num_workers);
-
-        int i;
-        for (i = 0; i < fr_recombo.num_workers; ++i) {
-            fr_recombo.workers[i] = fr;
-            fr_recombo.workers[i]._data = (double *)malloc(sizeof(double) * fr.w * rowseach_compute);
-            fr_recombo.idata[i]._data = (double *)malloc(sizeof(double) * fr.w * rowseach_compute);
-        }
-
-        fr_recombo._data = (double *)malloc(sizeof(double) * fr.w * fr.h);
-
-        */
-
+        atexit(end_render);
+        start_render();
     } else {
+        atexit(end_compute);
         start_compute();
     }
 
@@ -261,30 +259,15 @@ int main(int argc, char ** argv) {
 
 }
 
+
 void start_render() {
-
-    /*int sizeeach_compute = rowseach_compute * fr.w;
-    fr_t * compute_nodes = (fr_t * )malloc(sizeof(fr_t) * compute_size);
-    double ** compute_nodes_out = (double **)malloc(sizeof(double *) * compute_size);
-    int i;
-    for (i = 0; i < compute_size; ++i) {
-        compute_nodes[i].cX = fr.cX;
-        compute_nodes[i].cY = fr.cY;
-        compute_nodes[i].Z = fr.Z;
-        compute_nodes[i].max_iter = fr.max_iter;
-        compute_nodes[i].h_off = i * rowseach_compute;
-        compute_nodes_out[i] = (double *)malloc(sizeof(double) * sizeeach_compute);
-    }
-
-*/
+    mandelbrot_render(gargc, *gargv);
 }
 
-
-int nhsh(char *x, int n) {
-  int sum = 571, i;
-  for (i = 0; i < n; ++i) sum = sum * (x[n] + 3) % (sum / x[n] + 1);
-  return sum;
+void end_render() {
+  log_info("render ending");
 }
+
 
 
 void start_compute() {
@@ -307,26 +290,22 @@ void start_compute() {
 
     int my_h, my_off;
 
-    
+
     int cmp_size = 0, max_cmp_size = 0;
     int lmcs = 0;
 
     tperf_t tp_sc, tp_ms;
-    if (engine == E_C) {
-        log_debug("engine C");
-        mand_c_init();
-    } else if (engine == E_CUDA) {
-        log_debug("engine CUDA");
-        #ifdef USE_CUDA
-        mand_cuda_init(col);
-        #else
-        log_fatal("wasn't compiled with CUDA support");
-        M_EXIT(1);
-        #endif
 
-    } else {
-        log_error("Unknown engine");
-    }
+    log_debug("engine C");
+    mand_c_init();
+
+    #ifdef USE_CUDA
+    log_debug("engine CUDA");
+    mand_cuda_init(col);
+    #else
+    log_debug("wasn't compiled with CUDA support");
+    #endif
+
 
     while (true) {
         MPI_Bcast(&fr, 1, mpi_fr_t, 0, MPI_COMM_WORLD);
@@ -351,6 +330,7 @@ void start_compute() {
             pixels = (unsigned char *)malloc(fr.mem_w * my_h);
             pixels_cmp = (unsigned char *)malloc(max_cmp_size);
         }
+        memset(pixels, 0, fr.mem_w * my_h);
         C_TIME(tp_sc,
             if (engine == E_C) {
                 log_trace("mand_c starting");
@@ -374,18 +354,21 @@ void start_compute() {
         log_debug("computation fps: %lf", 1.0 / tp_sc.elapsed_s);
 
         C_TIME(tp_ms,
-
         //log_trace("sending pixels back, hash: %d", nhsh(pixels, fr.mem_w * my_h));
-          cmp_size = LZ4_compress_default((char *)pixels, (char *)pixels_cmp, my_h * fr.mem_w, max_cmp_size);     
+          cmp_size = LZ4_compress_default((char *)pixels, (char *)pixels_cmp, my_h * fr.mem_w, max_cmp_size);
           if (cmp_size <= 0) {
             log_error("error in compression function: %d", cmp_size);
           }
           MPI_Send(&cmp_size, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
-	  MPI_Send(pixels_cmp, cmp_size, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
+	        MPI_Send(pixels_cmp, cmp_size, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
         )
         }
         lmcs = max_cmp_size;
         fr_last = fr;
         has_ran = true;
     }
+}
+// when computing ends
+void end_compute() {
+    log_info("compute ending");
 }
