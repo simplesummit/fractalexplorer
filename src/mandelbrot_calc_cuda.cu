@@ -134,7 +134,7 @@ void mand_cuda_kernel(fr_t fr, int my_h, int my_off, unsigned char * col, int nc
     if (_q * (_q + (z[0] - .25f)) < z[1] * z[1] / 4.0f) {
         ci = fr.max_iter;
     } else {
-        for (ci = 0; ci < fr.max_iter && cabs(c) <= 16.0; ++ci) {
+        for (ci = 0; ci < fr.max_iter && cabs(z) <= 16.0; ++ci) {
             csqr(tmp, z);
             cadd(z, tmp, c);
         }
