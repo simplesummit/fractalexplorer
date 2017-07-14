@@ -6,7 +6,10 @@ if [ "$EUID" -ne 0 ];
   exit 1
 fi
 
+
 brew install SDL2 pkg-config mpich2 sdl2_ttf || exit 1
+
+cd /tmp/
 
 curl -L "https://github.com/lz4/lz4/archive/v1.7.5.tar.gz" > lz4.tar.gz
 tar xfv lz4.tar.gz
