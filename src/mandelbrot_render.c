@@ -29,14 +29,17 @@ can also find a copy at http://www.gnu.org/licenses/.
 #include <math.h>
 
 #include <SDL.h>
-
+#include <SDL_ttf.h>
 
 #define AXIS_MAX 32717.0f
 #define SDL_HNDL(x) res = x; if (res < 0) { log_fatal("While executing %s, SDL error: %s", #x, SDL_GetError()); }
 
 // smashes down x if abs(x) <= e
 #define SMASH(x, e) ((int)floor(((x) <= (e) && (x) >= -(e)) ? (0) : (x)))
+#define FONT_SIZE    30
 
+double last_fps = 0.0;
+double compress_rate = 0.0;
 
 tperf_t tperf_render;
 
@@ -63,6 +66,18 @@ SDL_GameControllerAxis horiz = 0, vert = 1, zaxis = 3;
 SDL_Window *window;
 SDL_Surface *surface;
 SDL_Surface *screen;
+TTF_Font *font;
+SDL_Surface * tsurface;
+SDL_Rect offset;
+
+
+SDL_Color text_color = { 255, 255, 255 };
+
+
+#define MAX_ONSCREEN_MESSAGE   (100 + 10 * 4)
+#define NUM_ONSCREEN_MESSAGE   (4)
+char ** onscreen_message = NULL;
+
 
 //int last_bt;
 
@@ -77,6 +92,8 @@ void gather_picture() {
     int i, pe = fr.h / fr.num_workers;
     unsigned char * naddr, * cmp_bytes = (unsigned char *)malloc(LZ4_compressBound(fr.mem_w * pe));
     int nbytes, cmp_nbytes;
+
+    double total_bytes = 0, total_compressed_bytes = 0;
 
     C_TIME(tp_bc,
     MPI_Bcast(&fr, 1, mpi_fr_t, 0, MPI_COMM_WORLD);
@@ -93,8 +110,11 @@ void gather_picture() {
 
         LZ4_decompress_safe((char *)cmp_bytes, (char*)naddr, cmp_nbytes, nbytes);
         log_trace("%%%lf of final size (worker %d)", 100.0 * cmp_nbytes / nbytes, i);
+        total_bytes += nbytes;
+        total_compressed_bytes += cmp_nbytes;
     }
     )
+    compress_rate = total_compressed_bytes / total_bytes;
     memcpy(surface->pixels, pixels, fr.mem_w * fr.h);
     //log_trace("MPI_Bcast(fr) fps: %lf", 1.0 / tp_bc.elapsed_s);
     log_trace("MPI_Recv(pixels) fps: %lf", 1.0 / tp_rv.elapsed_s);
@@ -106,6 +126,9 @@ void window_refresh() {
         return;
     }
     tperf_t tp_wr;
+
+    offset = (SDL_Rect){0, 0, 0, 0};
+
     C_TIME(tp_wr,
     if (pixels == NULL) {
         log_debug("remallocing render pixels");
@@ -123,13 +146,30 @@ void window_refresh() {
 
     draw();
 
+    if (onscreen_message == NULL) {
+        onscreen_message = malloc(NUM_ONSCREEN_MESSAGE * sizeof(char *));
+        int i;
+        for (i = 0; i < NUM_ONSCREEN_MESSAGE; ++i) {
+            onscreen_message[i] = malloc(MAX_ONSCREEN_MESSAGE);
+        }
+    }
+    sprintf(onscreen_message[0], "fps: %2.1lf", last_fps);
+    sprintf(onscreen_message[1], "compression rate: %1.2lf", compress_rate);
+
+    tsurface = TTF_RenderText_Solid(font, onscreen_message[0], text_color);
+    SDL_HNDL(SDL_BlitSurface(tsurface, NULL, screen, &offset));
+    offset.y += FONT_SIZE;
+    tsurface = TTF_RenderText_Solid(font, onscreen_message[1], text_color);
+    SDL_HNDL(SDL_BlitSurface(tsurface, NULL, screen, &offset));
+
+    SDL_HNDL(SDL_UpdateWindowSurface(window));
     //glTexImage2D(GL_TEXTURE_2D, 0, GL_BGRA, fr.w, fr.h, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, pixels);
     //glutSwapBuffers();
 
     )
     log_info("window_refresh() fps: %lf", 1.0 / tp_wr.elapsed_s);
+    last_fps = 1.0 / tp_wr.elapsed_s;
     //draw();
-
 }
 
 
@@ -140,8 +180,23 @@ void mandelbrot_render(int * argc, char ** argv) {
         exit(1);
     }
 
+    atexit(SDL_Quit);
 
-    log_debug("%i joysticks were found, using joystick[0]\n\n", SDL_NumJoysticks() );
+    int __res = 0;
+    if ((__res = TTF_Init()) < 0) {
+        log_fatal("Could not initialize SDL ttf: %d", __res);
+        exit(1);
+    }
+
+    atexit(TTF_Quit);
+
+    font = TTF_OpenFont("/Library/Fonts/AppleGothic.ttf", FONT_SIZE);
+    if (font == NULL) {
+        log_error("TTF_OpenFont() Failed: %s", TTF_GetError());
+        exit(1);
+    }
+
+    log_debug("%i joysticks were found, using joystick[0]\n\n", SDL_NumJoysticks());
     //log_debug("The names of the joysticks are:\n");
     if (SDL_NumJoysticks() > 0) {
         //controller = SDL_GameControllerOpen(0);
@@ -158,7 +213,6 @@ void mandelbrot_render(int * argc, char ** argv) {
         log_info("not using joystick");
     }
 
-    atexit(SDL_Quit);
 
     window = SDL_CreateWindow("Mandelbrot Render", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, fr.w, fr.h, 0);
     if (fr.w == 0 || fr.h == 0 || use_fullscreen) {
@@ -202,7 +256,7 @@ void mandelbrot_render(int * argc, char ** argv) {
                 double scale_allinput = (double)(SDL_GetTicks() - last_ticks) / 1000.0;
                 fr.cX += scale_allinput * horiz_v / (AXIS_MAX * fr.Z);
                 fr.cY -= scale_allinput * vert_v / (AXIS_MAX * fr.Z);
-                double zfact = 1.0 + 2.0 * scale_allinput * abs(zoom_v) / AXIS_MAX;
+                double zfact = 1.0 + scale_allinput * abs(zoom_v) / AXIS_MAX;
                 if (zoom_v > 0) {
                     fr.Z /= zfact;
                 } else if (zoom_v < 0) {
@@ -351,12 +405,7 @@ void mandelbrot_render(int * argc, char ** argv) {
 }
 
 void draw() {
-
     screen = SDL_GetWindowSurface(window);
 
-    SDL_HNDL(SDL_BlitScaled(surface, NULL, screen, NULL));
-    //SDL_BlitSurface(surface, NULL, screen, NULL);
-
-    SDL_HNDL(SDL_UpdateWindowSurface(window));
-
+    SDL_HNDL(SDL_BlitSurface(surface, NULL, screen, NULL));
 }

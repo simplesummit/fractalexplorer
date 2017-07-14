@@ -24,7 +24,7 @@ AM_LDFLAGS =
 bin_PROGRAMS = mandelbrot
 
 mandelbrot_SOURCES = mandelbrot.c mandelbrot.h fr.h color.c color.h log.c log.h mandelbrot_calc_c.c mandelbrot_calc_c.h  mandelbrot_calc_cuda.h util.c util.h mandelbrot_render.h mandelbrot_render.c
-mandelbrot_LDADD = @SDL_LDFLAGS@
+mandelbrot_LDADD = @SDL_LDFLAGS@ -lSDL2_ttf
 mandelbrot_CFLAGS = @SDL_CFLAGS@
 mandelbrot_LDFLAGS =
 
