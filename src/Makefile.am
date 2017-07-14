@@ -1,0 +1,43 @@
+###  src/Makefile.am -- Makefile for automake compiling main executables
+#
+#    This file is part of the small-summit-fractal project
+#
+#    small-summit-fractal source code, as well as any other resources in this
+#  project are free software; you are free to redistribute it and/or modify
+#  them under the terms of the GNU General Public License; either version 3 of
+#  thelicense, or any later version.
+#
+#    These programs are hopefully useful and reliable, but it is understood
+#  that these are provided WITHOUT ANY WARRANTY, or MERCHANTABILITY or FITNESS
+#  FOR A PARTICULAR PURPOSE. See the GPLv3 or email at
+#  <cade@cade.site> for more info on this.
+#
+#    Here is a copy of the GPL v3, which this software is licensed under. You
+#  can also find a copy at http://www.gnu.org/licenses/.
+###
+
+# what flags you want to pass to the C compiler & linker
+AM_CFLAGS = --pedantic -Wall -std=c99 -O2
+AM_LDFLAGS =
+
+
+bin_PROGRAMS = mandelbrot
+
+mandelbrot_SOURCES = mandelbrot.c mandelbrot.h fr.h color.c color.h log.c log.h mandelbrot_calc_c.c mandelbrot_calc_c.h  mandelbrot_calc_cuda.h util.c util.h mandelbrot_render.h mandelbrot_render.c
+mandelbrot_LDADD = @SDL_LDFLAGS@ -lSDL2_ttf
+mandelbrot_CFLAGS = @SDL_CFLAGS@
+mandelbrot_LDFLAGS =
+
+if HAVE_CUDA
+mandelbrot_LDADD += mandelbrot_calc_cuda.o
+mandelbrot_LDFLAGS += -lcuda -lcudart -lcudadevrt
+mandelbrot_LDADD += -lcuda -lcudart -lcudadevrt
+endif
+
+
+NVCC_CFLAGS = -gencode arch=compute_53,code=sm_53 -gencode arch=compute_60,code=sm_60 -gencode arch=compute_62,code=sm_62 -gencode arch=compute_62,code=compute_62
+CUDA_CFLAGS = @CUDA_CFLAGS@
+CUDA_LDFLAGS = @CUDA_LDFLAGS@
+
+mandelbrot_calc_cuda.o: mandelbrot_calc_cuda.cu fr.h
+	$(NVCC) $(CUDA_CFLAGS) $(NVCC_CFLAGS) -Xcompiler -fPIC -I. -I.. -DHAVE_CONFIG_H -m64 $(CUDA_LDFLAGS) -lib -o $@ -c $<
