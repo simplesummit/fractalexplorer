@@ -53,11 +53,9 @@ char *** gargv;
 
 bool use_fullscreen = false;
 
-#define mpi_fr_numitems (9)
-
 MPI_Datatype mpi_fr_t;
-int mpi_fr_blocklengths[mpi_fr_numitems] = { 1, 1, 1, 1, 1, 1, 1, 1, 1 };
-MPI_Datatype mpi_fr_types[mpi_fr_numitems] = { MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT };
+int mpi_fr_blocklengths[mpi_fr_numitems] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
+MPI_Datatype mpi_fr_types[mpi_fr_numitems] = { MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT };
 MPI_Aint mpi_fr_offsets[mpi_fr_numitems];
 
 
@@ -166,7 +164,6 @@ int main(int argc, char ** argv) {
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
 
-
     MPI_Get_processor_name(processor_name, &processor_name_len);
 
     int res = -100, loglvl;
@@ -174,10 +171,17 @@ int main(int argc, char ** argv) {
     fr.cX = .2821;
     fr.cY = .01;
     fr.Z = 1;
+    fr.coffset = 0;
+    fr.cscale = 1.0;
     fr.max_iter = 20;
     fr.w = 640;
     fr.h = 480;
+
+    // see fr.h for more types
     fr.fractal_type = FR_MANDELBROT;
+
+    // see fr.h for more  flags
+    fr.fractal_flags = FRF_NONE | FRF_TANKTREADS;// | FRF_SIMPLE;
 
     col.num = 20;
 
@@ -212,14 +216,15 @@ int main(int argc, char ** argv) {
     mpi_fr_offsets[0] = offsetof(fr_t, cX);
     mpi_fr_offsets[1] = offsetof(fr_t, cY);
     mpi_fr_offsets[2] = offsetof(fr_t, Z);
-    //mpi_fr_offsets[3] = offsetof(fr_t, coffset);
-   // mpi_fr_offsets[4] = offsetof(fr_t, cscale);
-    mpi_fr_offsets[3] = offsetof(fr_t, max_iter);
-    mpi_fr_offsets[4] = offsetof(fr_t, w);
-    mpi_fr_offsets[5] = offsetof(fr_t, h);
-    mpi_fr_offsets[6] = offsetof(fr_t, mem_w);
-    mpi_fr_offsets[7] = offsetof(fr_t, fractal_type);
-    mpi_fr_offsets[8] = offsetof(fr_t, num_workers);
+    mpi_fr_offsets[3] = offsetof(fr_t, coffset);
+    mpi_fr_offsets[4] = offsetof(fr_t, cscale);
+    mpi_fr_offsets[5] = offsetof(fr_t, max_iter);
+    mpi_fr_offsets[6] = offsetof(fr_t, w);
+    mpi_fr_offsets[7] = offsetof(fr_t, h);
+    mpi_fr_offsets[8] = offsetof(fr_t, mem_w);
+    mpi_fr_offsets[9] = offsetof(fr_t, fractal_type);
+    mpi_fr_offsets[10] = offsetof(fr_t, fractal_flags);
+    mpi_fr_offsets[11] = offsetof(fr_t, num_workers);
 
     MPI_Type_create_struct(mpi_fr_numitems, mpi_fr_blocklengths, mpi_fr_offsets, mpi_fr_types, &mpi_fr_t);
     MPI_Type_commit(&mpi_fr_t);
@@ -291,7 +296,7 @@ void start_compute() {
     int lmcs = 0;
 
     tperf_t tp_sc, tp_ms;
-
+    /*
     log_debug("engine C");
     mand_c_init();
 
@@ -301,7 +306,15 @@ void start_compute() {
     #else
     log_debug("wasn't compiled with CUDA support");
     #endif
+*/
 
+// macro to fail if we don't have cuda
+
+#ifdef HAVE_CUDA
+#define CUDA_EXEC log_trace("mand_cuda starting"); mand_cuda(fr, col, my_h, my_off, pixels);
+#else
+#define CUDA_EXEC log_fatal("wasn't compiled with CUDA support"); M_EXIT(1);
+#endif
 
     while (true) {
         MPI_Bcast(&fr, 1, mpi_fr_t, 0, MPI_COMM_WORLD);
@@ -332,13 +345,7 @@ void start_compute() {
                 log_trace("mand_c starting");
                 mand_c(fr, my_h, my_off, pixels);
             } else if (engine == E_CUDA) {
-                if (have_cuda) {
-                    log_trace("mand_cuda starting");
-                    mand_cuda(fr, my_h, my_off, pixels);
-                } else {
-                    log_fatal("wasn't compiled with CUDA support");
-                    M_EXIT(1);
-                }
+                CUDA_EXEC
             } else {
                 log_error("Unknown engine");
             }

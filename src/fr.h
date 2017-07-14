@@ -41,6 +41,20 @@ can also find a copy at http://www.gnu.org/licenses/.
 #define FR_FRACTAL_NUM            3
 
 
+/* fractal flags */
+
+// nothing, as a placeholder
+#define FRF_NONE                  (0x0000)
+
+// do simple coloring (no color mixing). This is especially useful with network
+// bound sessions, as simple coloring is easier to compress
+#define FRF_SIMPLE                (0x0001)
+
+
+// do tank tread iteration divisor, which creates an interesting image
+#define FRF_TANKTREADS            (0x0002)
+
+
 // the main fractal type. This type handles parameters (center, zoom, iter count
 // what kind of equation) as well as memory descriptions, as width, height,
 // memory width (pitch from SDL), and how many cores are rendering this fractal.
@@ -59,6 +73,10 @@ typedef struct fr_t {
     // creating a dppx variable (which should have a value of 2.0 / (Z * w))
     double cX, cY, Z;
 
+    // color offset and scale. The fri (fractional index) is tranformed by this
+    // rule: offset + fri * scale -> fri
+    double coffset, cscale;
+
     // how many iterations (at maximum) should be carried out to determine the
     // colorization of a pixel. In practice, most pixels reach only a fraction
     // of max_iter; they will 'escape' and be ruled out far before this many
@@ -75,8 +93,8 @@ typedef struct fr_t {
     int w, h, mem_w;
 
     // a fractal enum, see FR_* macros in this file (fr.h), this is typically
-    // handled in a case switch block
-    int fractal_type;
+    // handled in a case switch block. See FRF_* macros for flags
+    int fractal_type, fractal_flags;
 
     // how many workers are working on the current image, and take note that
     // while initially equal to the macro `compute_size`, the render node can

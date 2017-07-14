@@ -27,10 +27,20 @@ can also find a copy at http://www.gnu.org/licenses/.
 #include "tgmath.h"
 
 
+// a macro to scale between values. when F = 0, MIX macro takes the
+// value of a, when F = 1.0, the macro takes the value of b, and all
+// values inbetween are linearly scaled
+#define MIX(a, b, F) ((b) * (F) + (a) * (1 - (F)))
+
+// keeps track of whether the engine has initialized
+bool c_has_init = false;
+
 // initialize any buffers, caches, etc here. The C engine uses normal system
 // memory, so no special buffers are required
 void mand_c_init() {
-    // do nothing
+    if (!c_has_init) {
+        c_has_init = true;
+    }
 }
 
 
@@ -62,6 +72,9 @@ inline bool bulb_check_0(double complex p) {
 // of 4 bytes/px. Although, the index of point (px, py) is determined by
 // fr.mem_w (see fr.h for more on this)
 void mand_c(fr_t fr, int my_h, int my_off, unsigned char * output) {
+    // ensure the engine is initialized
+    mand_c_init();
+
     // current x, y pixels
     int px, py;
 
@@ -94,6 +107,7 @@ void mand_c(fr_t fr, int my_h, int my_off, unsigned char * output) {
         // we need to make sure we don't overshoot fr.h, and we only do (at max)
         // my_h rows
         for (py = 0; py < my_h && my_off + py < fr.h; ++py) {
+
             // return index is fr.mem_w (which includes the factor of 4) and
             // the factor of 4 times the horizontal offset. Then, 0 bytes away
             // is R, 1 is B, 2 is G, 3 is A
@@ -154,14 +168,17 @@ void mand_c(fr_t fr, int my_h, int my_off, unsigned char * output) {
                         // https://linas.org/art-gallery/escape/escape.html
                         // We have modified it a bit to produce even more
                         // pleasing images
-                        tmp = log(log(creal(z)*creal(z) + cimag(z)*cimag(z)))
-                              / log(2.0);
-                        fri = 2.0 + ci - tmp;
-
+                        tmp = log(log(creal(z)*creal(z) + cimag(z)*cimag(z)));
+                        if (fr.fractal_flags & FRF_TANKTREADS) {
+                            fri = 2.0 + ci - tmp / log(2.5);
+                        } else {
+                            fri = 2.0 + ci - tmp / log(2.0);
+                        }
                     } else {
                         // skip out early, and set that this point will be part
                         // of the mandelbrot set
                         ci = fr.max_iter;
+                        fri = ci + 0.0;
                     }
                     break;
                 case FR_MANDELBROT_3:
@@ -205,17 +222,23 @@ void mand_c(fr_t fr, int my_h, int my_off, unsigned char * output) {
             // if ci is set to default values, if they have set ci to 0 or max
             // the computation might iter,
             // set the fri to corresponding values
-            if (ci == 0 || ci == fr.max_iter) {
+            if (ci == fr.max_iter) {
                 fri = 0.0 + fr.max_iter;
             }
 
             // TODO: implement scale and offset for function
-            //fri = fri * fr.cscale + fr.coffset;
-            mfact = fri - floor(fri);
+            fri = fri * fr.cscale + fr.coffset;
+
+            // toggle for gradients or not. Keep FRF_SIMPLE as a flag to
+            // increase compression ratios
+            if (fr.fractal_flags & FRF_SIMPLE) {
+                mfact = 0;
+            } else {
+                mfact = fri - floor(fri);
+            }
 
             // TODO: add toggle to do simple or complex coloring, right now we
             // are just forcing simple
-            mfact = 0;
 
             // convert this to an index
             c0 = (int)floor(fri) % col.num;
@@ -228,7 +251,6 @@ void mand_c(fr_t fr, int my_h, int my_off, unsigned char * output) {
             // a macro to scale between values. when F = 0, MIX macro takes the
             // value of a, when F = 1.0, the macro takes the value of b, and all
             // values inbetween are linearly scaled
-            #define MIX(a, b, F) ((b) * (F) + (a) * (1 - (F)))
 
             // set each to the mix between colorscheme values
             output[ri + 0] = (int)floor(MIX(col.col[c0 + 0], col.col[c1 + 0], mfact));

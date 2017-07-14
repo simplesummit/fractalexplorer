@@ -26,7 +26,7 @@ can also find a copy at http://www.gnu.org/licenses/.
 
 void mand_cuda_init(fr_col_t col);
 
-void mand_cuda(fr_t fr, int my_h, int my_off, unsigned char * output);
+void mand_cuda(fr_t fr, fr_col_t fr_col, int my_h, int my_off, unsigned char * output);
 
 
 #endif

@@ -83,14 +83,16 @@ int colnum;
 
 // GPU buffers
 unsigned char * _gpu_output = NULL, * _gpu_col = NULL;
+int * _gpu_err = NULL;
+bool cuda_has_init = false;
 
 
 // a CUDA device kernel to compute fractal pixels value. Takes fr as parameters,
 // my_h and my_off for custom rank based parameters, color and the number of
-// colors, and an output buffer. Note that the buffers should be allocated
-// with CUDA device memory functions
+// colors, and an output buffer. err will be set to non-zero if an error occured
+// Note that the buffers should be allocated with CUDA device memory functions
 __global__
-void mand_cuda_kernel(fr_t fr, int my_h, int my_off, unsigned char * col, int ncol, unsigned char * output) {
+void mand_cuda_kernel(fr_t fr, int my_h, int my_off, unsigned char * col, int ncol, unsigned char * output, int * err) {
 
     // compute the current pixel offset
     int px = (blockIdx.x * blockDim.x) + threadIdx.x;
@@ -108,6 +110,7 @@ void mand_cuda_kernel(fr_t fr, int my_h, int my_off, unsigned char * col, int nc
     // the offset is added (as the px and py are 0 based)
     py += my_off;
 
+    // fractional index
     double fri, mfact, _q;
 
     // real, imaginary
@@ -119,6 +122,12 @@ void mand_cuda_kernel(fr_t fr, int my_h, int my_off, unsigned char * col, int nc
     complex z;
     cset(z, c);
     complex tmp;
+
+    switch (fr.fractal_type) {
+
+        default:
+            break;
+    }
 
     _q = (z[0] - .25f);
     _q = _q * _q + z[1] * z[1];
@@ -158,12 +167,18 @@ void mand_cuda_kernel(fr_t fr, int my_h, int my_off, unsigned char * col, int nc
 }
 
 void mand_cuda_init(fr_col_t col) {
-    colnum = col.num;
-    gpuErrchk(cudaMalloc((void **)&_gpu_col, 4 * colnum));
-    gpuErrchk(cudaMemcpy(_gpu_col, col.col, 4 * colnum, cudaMemcpyHostToDevice));
+    if (!cuda_has_init) {
+        colnum = col.num;
+        gpuErrchk(cudaMalloc((void **)&_gpu_err, sizeof(int)));
+        gpuErrchk(cudaMalloc((void **)&_gpu_col, 4 * colnum));
+        gpuErrchk(cudaMemcpy(_gpu_col, col.col, 4 * colnum, cudaMemcpyHostToDevice));
+        cuda_has_init = true;
+    }
 }
 
-void mand_cuda(fr_t fr, int my_h, int my_off, unsigned char * output) {
+void mand_cuda(fr_t fr, fr_col_t col, int my_h, int my_off, unsigned char * output) {
+    mand_cuda_init(col);
+
     dim3 dimBlock(4, 4);
     dim3 dimGrid(fr.w / 4, my_h / 4);
 
@@ -177,14 +192,20 @@ void mand_cuda(fr_t fr, int my_h, int my_off, unsigned char * output) {
 
 
     // we dont need cudaMalloc(), because of ZEROcopy buffers that the GPU and CPU can share sys memory
-    mand_cuda_kernel<<<dimGrid, dimBlock>>>(fr, my_h, my_off, _gpu_col, colnum, _gpu_output);
+    mand_cuda_kernel<<<dimGrid, dimBlock>>>(fr, my_h, my_off, _gpu_col, colnum, _gpu_output, _gpu_err);
 
 
     gpuErrchk(cudaDeviceSynchronize());
     gpuErrchk(cudaPeekAtLastError());
 
+    int res_err = 0;
 
     gpuErrchk(cudaMemcpy(output, _gpu_output, fr.mem_w * my_h, cudaMemcpyDeviceToHost));
+    gpuErrchk(cudaMemcpy(&res_err, _gpu_err, sizeof(int), cudaMemcpyDeviceToHost));
+
+    if (res_err != 0) {
+        fprintf(stderr, "result from cuda kernel is non-zero: %d\n", res_err);
+    }
 
     lw = fr.mem_w;
     lh = my_h;

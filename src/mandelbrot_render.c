@@ -202,7 +202,7 @@ void mandelbrot_render(int * argc, char ** argv) {
                 double scale_allinput = (double)(SDL_GetTicks() - last_ticks) / 1000.0;
                 fr.cX += scale_allinput * horiz_v / (AXIS_MAX * fr.Z);
                 fr.cY -= scale_allinput * vert_v / (AXIS_MAX * fr.Z);
-                double zfact = 1.0 + scale_allinput * abs(zoom_v) / AXIS_MAX;
+                double zfact = 1.0 + 2.0 * scale_allinput * abs(zoom_v) / AXIS_MAX;
                 if (zoom_v > 0) {
                     fr.Z /= zfact;
                 } else if (zoom_v < 0) {
@@ -268,9 +268,17 @@ void mandelbrot_render(int * argc, char ** argv) {
                         } else if (cevent.key.keysym.sym == SDLK_ESCAPE) {
                             keep_going = false;
                             inner_keep_going = false;
+                        } else if (cevent.key.keysym.sym == 'p') {
+                            fr.max_iter += 1;
+                            update = true;
+                        } else if (cevent.key.keysym.sym == 'o') {
+                            if (fr.max_iter > 0) {
+                                fr.max_iter -= 1;
+                                update = true;
+                            }
                         } else if (cevent.key.keysym.sym == 'k' && cevent.key.repeat == 0) {
                             if (fr.num_workers < compute_size) {
-			                    fr.num_workers++;
+			                          fr.num_workers++;
                                 update = true;
                             }
                         } else if (cevent.key.keysym.sym == 'j' && cevent.key.repeat == 0) {
