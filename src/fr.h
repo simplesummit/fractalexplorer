@@ -33,12 +33,15 @@ can also find a copy at http://www.gnu.org/licenses/.
 
 /* extra functions, not fully fleshed out */
 
-// testing sin function, sin(z) + c. This needs work testing for escape bounds!
-#define FR_SIN               (0x0103)
+// testing exp function, exp(z) + c. This needs work testing for escape bounds!
+#define FR_EXP               (0x0103)
+
+// testing sin function, sin(z) + c.
+#define FR_SIN               (0x0104)
 
 
 // how many fractal types
-#define FR_FRACTAL_NUM            3
+#define FR_FRACTAL_NUM            4
 
 
 /* fractal flags */

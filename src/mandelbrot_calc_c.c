@@ -199,11 +199,20 @@ void mand_c(fr_t fr, int my_h, int my_off, unsigned char * output) {
                           / log(3.0);
                     fri = 2.0 + ci - tmp;
                     break;
+                case FR_EXP:
+                    //
+                    for (ci = 0; ci < fr.max_iter && abs(creal(z)) < 16.0; ++ci) {
+                        z = exp(z) + c;
+                    }
+                    // no current way to easily do a fractional iteration, so
+                    // just send a fractional iteration of the actual integer
+                    // value
+                    fri = 0.0 + ci;
+                    break;
                 case FR_SIN:
-                    // TODO: add better escape conditions.
                     // the sin(z)+c may not just escape from a radius, and we
-                    // should check that
-                    for (ci = 0; ci < fr.max_iter && abs(z) <= 16.0; ++ci) {
+                    // should check that the imaginary portion escapes
+                    for (ci = 0; ci < fr.max_iter && abs(cimag(z)) < 16.0; ++ci) {
                         z = sin(z) + c;
                     }
                     // no current way to easily do a fractional iteration, so

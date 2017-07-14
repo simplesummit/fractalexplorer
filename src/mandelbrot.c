@@ -39,10 +39,7 @@ int processor_name_len;
 
 int fractal_types_idx = 0;
 int fractal_types[FR_FRACTAL_NUM] = {
-    FR_MANDELBROT, FR_MANDELBROT_3, FR_SIN
-#ifdef DEV
-    , FR_TESTING
-#endif
+    FR_MANDELBROT, FR_MANDELBROT_3, FR_EXP, FR_SIN
 
 };
 
