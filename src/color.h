@@ -1,8 +1,8 @@
 /* color.h -- header file exposing the common color utilities
 
-  This file is part of the small-summit-fractal project.
+  This file is part of the fractalexplorer project.
 
-  small-summit-fractal source code, as well as any other resources in this
+  fractalexplorer source code, as well as any other resources in this
 project are free software; you are free to redistribute it and/or modify them
 under the terms of the GNU General Public License; either version 3 of the
 license, or any later version.

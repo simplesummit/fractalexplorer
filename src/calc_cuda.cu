@@ -1,9 +1,9 @@
-/* mandelbrot_calc_cuda.cu -- CUDA engine, which is only included if the
-                           -- platform supports it
+/* calc_cuda.cu -- CUDA engine, which is only included if the platform supports
+                -- it
 
-  This file is part of the small-summit-fractal project.
+  This file is part of the fractalexplorer project.
 
-  small-summit-fractal source code, as well as any other resources in this
+  fractalexplorer source code, as well as any other resources in this
 project are free software; you are free to redistribute it and/or modify them
 under the terms of the GNU General Public License; either version 3 of the
 license, or any later version.
@@ -92,7 +92,7 @@ bool cuda_has_init = false;
 // colors, and an output buffer. err will be set to non-zero if an error occured
 // Note that the buffers should be allocated with CUDA device memory functions
 __global__
-void mand_cuda_kernel(fr_t fr, int my_h, int my_off, unsigned char * col, int ncol, unsigned char * output, int * err) {
+void cuda_kernel(fr_t fr, int my_h, int my_off, unsigned char * col, int ncol, unsigned char * output, int * err) {
 
     // compute the current pixel offset
     int px = (blockIdx.x * blockDim.x) + threadIdx.x;
@@ -166,7 +166,7 @@ void mand_cuda_kernel(fr_t fr, int my_h, int my_off, unsigned char * col, int nc
 
 }
 
-void mand_cuda_init(fr_col_t col) {
+void calc_cuda_init(fr_col_t col) {
     if (!cuda_has_init) {
         colnum = col.num;
         gpuErrchk(cudaMalloc((void **)&_gpu_err, sizeof(int)));
@@ -176,8 +176,8 @@ void mand_cuda_init(fr_col_t col) {
     }
 }
 
-void mand_cuda(fr_t fr, fr_col_t col, int my_h, int my_off, unsigned char * output) {
-    mand_cuda_init(col);
+void calc_cuda(fr_t fr, fr_col_t col, int my_h, int my_off, unsigned char * output) {
+    calc_cuda_init(col);
 
     dim3 dimBlock(4, 4);
     dim3 dimGrid(fr.w / 4, my_h / 4);
@@ -192,7 +192,7 @@ void mand_cuda(fr_t fr, fr_col_t col, int my_h, int my_off, unsigned char * outp
 
 
     // we dont need cudaMalloc(), because of ZEROcopy buffers that the GPU and CPU can share sys memory
-    mand_cuda_kernel<<<dimGrid, dimBlock>>>(fr, my_h, my_off, _gpu_col, colnum, _gpu_output, _gpu_err);
+    cuda_kernel<<<dimGrid, dimBlock>>>(fr, my_h, my_off, _gpu_col, colnum, _gpu_output, _gpu_err);
 
 
     gpuErrchk(cudaDeviceSynchronize());

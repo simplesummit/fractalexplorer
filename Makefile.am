@@ -7,4 +7,4 @@ SUBDIRS=src
 
 ACLOCAL_AMFLAGS=-I custom_m4
 
-EXTRA_DIST=README.md LICENSE custom_m4
+EXTRA_DIST=README.md LICENSE UbuntuMono.ttf install_macos.sh install_ubuntu.sh custom_m4

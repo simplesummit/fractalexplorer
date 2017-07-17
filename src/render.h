@@ -1,8 +1,8 @@
-/* mandelbrot_calc_c.h -- defines C engine functions
+/* render.h -- defines method for the render node to use
 
-  This file is part of the small-summit-fractal project.
+  This file is part of the fractalexplorer project.
 
-  small-summit-fractal source code, as well as any other resources in this
+  fractalexplorer source code, as well as any other resources in this
 project are free software; you are free to redistribute it and/or modify them
 under the terms of the GNU General Public License; either version 3 of the
 license, or any later version.
@@ -17,12 +17,14 @@ can also find a copy at http://www.gnu.org/licenses/.
 
 */
 
-#ifndef __MANDELBROT_CALC_C_H__
-#define __MANDELBROT_CALC_C_H__
+#ifndef __RENDER_H__
+#define __RENDER_H__
 
-void mand_c_init();
+void fractalexplorer_render(int * argc, char ** argv);
 
-// calculate image and store it in output
-void mand_c(fr_t fr, int my_h, int my_off, unsigned char * output);
+void window_refresh();
+
+void draw();
+
 
 #endif

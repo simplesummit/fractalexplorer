@@ -1,8 +1,8 @@
-/* mandelbrot_calc_c.c -- the default C engine that will work on all platforms
+/* calc_c.c -- the default C engine that will work on all platforms
 
-  This file is part of the small-summit-fractal project.
+  This file is part of the fractalexplorer project.
 
-  small-summit-fractal source code, as well as any other resources in this
+  fractalexplorer source code, as well as any other resources in this
 project are free software; you are free to redistribute it and/or modify them
 under the terms of the GNU General Public License; either version 3 of the
 license, or any later version.
@@ -17,8 +17,8 @@ can also find a copy at http://www.gnu.org/licenses/.
 
 */
 
-#include "mandelbrot.h"
-#include "mandelbrot_calc_c.h"
+#include "fractalexplorer.h"
+#include "calc_c.h"
 
 // type generic math macros, which finds the correct function based on input.
 // this slows down compile time at the preprocessing step, and this should be
@@ -37,7 +37,7 @@ bool c_has_init = false;
 
 // initialize any buffers, caches, etc here. The C engine uses normal system
 // memory, so no special buffers are required
-void mand_c_init() {
+void calc_c_init() {
     if (!c_has_init) {
         c_has_init = true;
     }
@@ -71,9 +71,9 @@ inline bool bulb_check_0(double complex p) {
 // at (0, my_off) and lasting till (fr.w - 1, my_off + my_h), with a pixel depth
 // of 4 bytes/px. Although, the index of point (px, py) is determined by
 // fr.mem_w (see fr.h for more on this)
-void mand_c(fr_t fr, int my_h, int my_off, unsigned char * output) {
+void calc_c(fr_t fr, int my_h, int my_off, unsigned char * output) {
     // ensure the engine is initialized
-    mand_c_init();
+    calc_c_init();
 
     // current x, y pixels
     int px, py;

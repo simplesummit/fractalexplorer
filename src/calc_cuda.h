@@ -1,4 +1,7 @@
-/* util.c -- implements various utilities
+/* calc_cuda.h -- exposes CUDA engine to other files. Specifically, calc_cuda.cu
+               -- must be compiled by NVCC and then linked. This header file is
+               -- neccesary to define unresolved symbols before the final link
+               -- step
 
   This file is part of the fractalexplorer project.
 
@@ -17,7 +20,12 @@ can also find a copy at http://www.gnu.org/licenses/.
 
 */
 
-#include "util.h"
+#ifndef __CALC_CUDA_H__
+#define __CALC_CUDA_H__
+
+void calc_cuda_init(fr_col_t col);
+
+void calc_cuda(fr_t fr, fr_col_t fr_col, int my_h, int my_off, unsigned char * output);
 
 
-//
+#endif

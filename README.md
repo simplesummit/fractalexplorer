@@ -1,17 +1,17 @@
-# small summit demo
+# fractalexplorer
 
-This is a repository for simulation and interactive program to be ran on small summit
+This is a repository for simulation and interactive program to be ran on leconte
 
 ## Requirements
 
-Currently, this is only known to work on Linux, either my personal desktop, or a Jetson TX2 (which small summit will use).
+Currently, this is only known to work on MacOS, Linux, either my personal desktop, or a Jetson TX2 (which is what leconte uses).
 
 You need:
 
   * C compiler for MPI (`mpicc`)
   * MPI libraries
-  * SDL2
-  * LZ4 (a specific version is required, >= 1.7.0, see `install_jetsonTX2.sh` for a URL)
+  * SDL2 and SDL2_ttf
+  * LZ4 (a specific version is required, >= 1.7.0, see `install_ubuntu.sh` for a URL)
 
 Optionally, the following are supported:
 
@@ -24,31 +24,28 @@ To build, run:
 
 `./configure && make`
 
-(this should work on all Jetson TX2 machines)
-
 to build without CUDA support, run:
 
 `./configure --without-cuda`
 
-The resulting binary is `./src/mandelbrot`
+The resulting binary is `./src/fractalexplorer`, and must be ran with `mpirun`
 
 ## Installing
 
-For installing on a Small-Summit machine, run this on each machine (there are normally 8 jetsons):
+Install scripts for required software are provided for macOS and ubuntu, they should be ran like: `./install_macos.sh` or `./install_ubuntu.sh` respectively.
 
-`sudo ./install_jetsonTX2.sh`
 
 
 ## Running
 
 To run, use `mpirun`:
 
-`mpirun -n 1 ./src/mandelbrot -h`
+`mpirun -n 1 ./src/fractalexplorer -h`
 
 to view help.
 
 
-Run `mpirun -n 6 ./src/mandelbrot -i250 -crandom -F` to do a fullscreen render.
+Run `mpirun -n 6 ./src/fractalexplorer -i250 -crandom -F` to do a fullscreen render.
 
 You will need at least 2 threads (1 head and 1 compute), but you can add as many as you'd like.
 
@@ -57,10 +54,4 @@ TODO: Add multi-machine example
 
 ## Bundling
 
-To distribute source, run `make dist-gzip`, you should have `small-summit-mandelbrot-VERSION.tar.gz`
-
-
-
-
-
-
+To distribute source, run `make dist-gzip`, you should have `fractalexplorer-VERSION.tar.gz`

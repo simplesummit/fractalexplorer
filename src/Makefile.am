@@ -21,17 +21,17 @@ AM_CFLAGS = --pedantic -Wall -std=c99 -O2
 AM_LDFLAGS =
 
 
-bin_PROGRAMS = mandelbrot
+bin_PROGRAMS = fractalexplorer
 
-mandelbrot_SOURCES = mandelbrot.c mandelbrot.h fr.h color.c color.h log.c log.h mandelbrot_calc_c.c mandelbrot_calc_c.h  mandelbrot_calc_cuda.h util.c util.h mandelbrot_render.h mandelbrot_render.c
-mandelbrot_LDADD = @SDL_LDFLAGS@ -lSDL2_ttf
-mandelbrot_CFLAGS = @SDL_CFLAGS@
-mandelbrot_LDFLAGS =
+fractalexplorer_SOURCES = fractalexplorer.c fractalexplorer.h fr.h color.c color.h log.c log.h calc_c.c calc_c.h  fractalexplorer_calc_cuda.h util.c util.hrender.h render.c
+fractalexplorer_LDADD = @SDL_LDFLAGS@ -lSDL2_ttf
+fractalexplorer_CFLAGS = @SDL_CFLAGS@
+fractalexplorer_LDFLAGS =
 
 if HAVE_CUDA
-mandelbrot_LDADD += mandelbrot_calc_cuda.o
-mandelbrot_LDFLAGS += -lcuda -lcudart -lcudadevrt
-mandelbrot_LDADD += -lcuda -lcudart -lcudadevrt
+fractalexplorer_LDADD += calc_cuda.o
+fractalexplorer_LDFLAGS += -lcuda -lcudart -lcudadevrt
+fractalexplorer_LDADD += -lcuda -lcudart -lcudadevrt
 endif
 
 
@@ -39,5 +39,5 @@ NVCC_CFLAGS = -gencode arch=compute_53,code=sm_53 -gencode arch=compute_60,code=
 CUDA_CFLAGS = @CUDA_CFLAGS@
 CUDA_LDFLAGS = @CUDA_LDFLAGS@
 
-mandelbrot_calc_cuda.o: mandelbrot_calc_cuda.cu fr.h
+calc_cuda.o: calc_cuda.cu fr.h
 	$(NVCC) $(CUDA_CFLAGS) $(NVCC_CFLAGS) -Xcompiler -fPIC -I. -I.. -DHAVE_CONFIG_H -m64 $(CUDA_LDFLAGS) -lib -o $@ -c $<

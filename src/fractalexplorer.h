@@ -1,8 +1,8 @@
-/* mandelbrot.h -- header for most files
+/* fractalexplorer.h -- header for most files
 
-  This file is part of the small-summit-fractal project.
+  This file is part of the fractalexplorer project.
 
-  small-summit-fractal source code, as well as any other resources in this
+  fractalexplorer source code, as well as any other resources in this
 project are free software; you are free to redistribute it and/or modify them
 under the terms of the GNU General Public License; either version 3 of the
 license, or any later version.
@@ -17,8 +17,8 @@ can also find a copy at http://www.gnu.org/licenses/.
 
 */
 
-#ifndef __MANDELBROT_H__
-#define __MANDELBROT_H__
+#ifndef __FRACTALEXPLORER_H__
+#define __FRACTALEXPLORER_H__
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"

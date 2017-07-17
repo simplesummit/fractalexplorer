@@ -1,9 +1,9 @@
-/* mandelbrot_render.c -- this is ran on the head node, and is responsible for
-                       -- communication and screen rendering
+/* render.c -- this is ran on the head node, and is responsible for
+            -- communication and screen rendering
 
-  This file is part of the small-summit-fractal project.
+  This file is part of the fractalexplorer project.
 
-  small-summit-fractal source code, as well as any other resources in this
+  fractalexplorer source code, as well as any other resources in this
 project are free software; you are free to redistribute it and/or modify them
 under the terms of the GNU General Public License; either version 3 of the
 license, or any later version.
@@ -18,9 +18,9 @@ can also find a copy at http://www.gnu.org/licenses/.
 
 */
 
-#include "mandelbrot.h"
-#include "mandelbrot_calc_c.h"
-#include "mandelbrot_render.h"
+#include "fractalexplorer.h"
+#include "calc_c.h"
+#include "render.h"
 
 #include <lz4.h>
 
@@ -173,7 +173,7 @@ void window_refresh() {
 }
 
 
-void mandelbrot_render(int * argc, char ** argv) {
+void fractalexplorer_render(int * argc, char ** argv) {
 
     if (SDL_Init(SDL_INIT_JOYSTICK | SDL_INIT_VIDEO)) {
         log_fatal("Could not initialize SDL: %s", SDL_GetError());

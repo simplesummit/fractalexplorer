@@ -8,6 +8,7 @@
 
 src/particle_sim
 src/mandelbrot
+src/fractalexplorer
 
 .vscode
 
@@ -122,5 +123,3 @@ compileopencl.sh
 .vscode/
 
 *.Po
-
-

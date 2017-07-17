@@ -1,8 +1,8 @@
-/* mandelbrot.c -- main summit demo file
+/* fractalexplorer.c -- executable main file
 
-  This file is part of the small-summit-fractal project.
+  This file is part of the fractalexplorer project.
 
-  small-summit-fractal source code, as well as any other resources in this
+  fractalexplorer source code, as well as any other resources in this
 project are free software; you are free to redistribute it and/or modify them
 under the terms of the GNU General Public License; either version 3 of the
 license, or any later version.
@@ -24,10 +24,10 @@ can also find a copy at http://www.gnu.org/licenses/.
 #include "lz4.h"
 #include "fr.h"
 #include <stddef.h>
-#include "mandelbrot.h"
-#include "mandelbrot_render.h"
-#include "mandelbrot_calc_c.h"
-#include "mandelbrot_calc_cuda.h"
+#include "fractalexplorer.h"
+#include "render.h"
+#include "calc_c.h"
+#include "calc_cuda.h"
 #include "color.h"
 
 #define SEQ(a, b) (strcmp(a, b) == 0)
@@ -259,7 +259,7 @@ int main(int argc, char ** argv) {
 
 
 void start_render() {
-    mandelbrot_render(gargc, *gargv);
+    fractalexplorer_render(gargc, *gargv);
 }
 
 void end_render() {
@@ -308,7 +308,7 @@ void start_compute() {
 // macro to fail if we don't have cuda
 
 #ifdef HAVE_CUDA
-#define CUDA_EXEC log_trace("mand_cuda starting"); mand_cuda(fr, col, my_h, my_off, pixels);
+#define CUDA_EXEC log_trace("mand_cuda starting"); calc_cuda(fr, col, my_h, my_off, pixels);
 #else
 #define CUDA_EXEC log_fatal("wasn't compiled with CUDA support"); M_EXIT(1);
 #endif
@@ -340,7 +340,7 @@ void start_compute() {
         C_TIME(tp_sc,
             if (engine == E_C) {
                 log_trace("mand_c starting");
-                mand_c(fr, my_h, my_off, pixels);
+                calc_c(fr, my_h, my_off, pixels);
             } else if (engine == E_CUDA) {
                 CUDA_EXEC
             } else {

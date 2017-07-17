@@ -1,8 +1,8 @@
 ###  configure.ac -- Autoconf configuration script
 #
-#    This file is part of the small-summit-fractal project
+#    This file is part of the fractalexplorer project
 #
-#    small-summit-fractal source code, as well as any other resources in this
+#    fractalexplorer source code, as well as any other resources in this
 #  project are free software; you are free to redistribute it and/or modify
 #  them under the terms of the GNU General Public License; either version 3 of
 #  thelicense, or any later version.
@@ -18,14 +18,14 @@
 
 
 AC_PREREQ([2.55])
-AC_INIT([small-summit-mandelbrot], [0.1.0], [cade@cade.site])
+AC_INIT([fractalexplorer], [0.1.0], [cade@cade.site])
 
 AC_CONFIG_MACRO_DIRS([custom_m4])
 
 AM_INIT_AUTOMAKE([])
 
 
-AC_CONFIG_SRCDIR([src/mandelbrot.h])
+AC_CONFIG_SRCDIR([src/fractalexplorer.h])
 AC_CONFIG_HEADERS([config.h])
 
 if test -z "$CC"; then
