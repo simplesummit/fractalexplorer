@@ -190,7 +190,7 @@ void mandelbrot_render(int * argc, char ** argv) {
 
     atexit(TTF_Quit);
 
-    font = TTF_OpenFont("/Library/Fonts/AppleGothic.ttf", FONT_SIZE);
+    font = TTF_OpenFont("UbuntuMono.ttf", FONT_SIZE);
     if (font == NULL) {
         log_error("TTF_OpenFont() Failed: %s", TTF_GetError());
         exit(1);
