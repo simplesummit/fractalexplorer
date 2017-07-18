@@ -139,6 +139,7 @@ void gather_picture() {
     )
 
     C_TIME(tp_rv,
+    memset(pixels, 0, fr.mem_w * fr.h);
     // loop through all workers
     for (i = 1; i <= fr.num_workers; ++i) {
         // get the offset into the final

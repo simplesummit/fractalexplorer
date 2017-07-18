@@ -55,15 +55,38 @@ cuDoubleComplex cuCexp(cuDoubleComplex x) {
     return result;
 }
 
-// sin, returns sin(x)
+// natural logarithm, base e ~= 2.71828
+__host__ __device__ static __inline__
+cuDoubleComplex cuClog(cuDoubleComplex x) {
+    cuDoubleComplex result = { 0.0, 0.0 };
+    result.x = log(x.x * x.x + x.y * x.y) / 2.0;
+    result.y = atan2(x.y, x.x);
+    return result;
+}
+
+__host__ __device__ static __inline__
+cuDoubleComplex cuClogb(cuDoubleComplex x, cuDoubleComplex y) {
+    return cuCexp(cuCmul(cuClog(x), y));
+}
+
+// sin, returns sin(x). Highly optimized method
+// correct for all complex numbers
 __host__ __device__ static __inline__
 cuDoubleComplex cuCsin(cuDoubleComplex x) {
     cuDoubleComplex result = { 0.0, 0.0 };
-    double tmp_scale = exp(x.x);
-    sincos(x.y, &result.y, &result.x);
-    result.x *= tmp_scale;
-    result.y *= tmp_scale;
+    result.x = sin(x.x) * cosh(x.y);
+    result.y = cos(x.x) * sinh(x.y);
     return result;
+}
+
+
+// cos, returns cos(x). Highly optimized and
+// works for complex numbers
+__host__ __device__ static __inline__
+cuDoubleComplex cuCcos(cuDoubleComplex x) {
+    cuDoubleComplex result = { 0.0, 0.0 };
+    result.x = cos(x.x) * cos(x.y);
+    result.y = -sin(x.x) * sinh(x.y);
 }
 
 
@@ -227,7 +250,6 @@ void cuda_kernel(fr_t fr, int my_h, int my_off, unsigned char * col, int ncol, u
     c0 *= 4; c1 *= 4;
 
     #define MIX(a, b, F) ((b) * (F) + (a) * (1 - (F)))
-
 
     output[ri + 0] = (int)floor(MIX(col[c0 + 0], col[c1 + 0], mfact));
     output[ri + 1] = (int)floor(MIX(col[c0 + 1], col[c1 + 1], mfact));
