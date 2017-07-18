@@ -18,44 +18,54 @@ can also find a copy at http://www.gnu.org/licenses/.
 
 */
 
+#include <cuComplex.h>
+
+
 extern "C" {
 
 #include <stdio.h>
 #include <stdlib.h>
 
+typedef cuDoubleComplex complex;
 
-typedef
-double
-complex[2];
-
-/* complex function macros */
-
-// sets r to a
-// r can be a
-#define cset(r, a) r[0] = a[0]; r[1] = a[1];
-
-// returns a + b
-// r can be a or b
-#define cadd(r, a, b) r[0] = a[0] + b[0]; r[1] = a[1] + b[1];
-
-// returns a - b
-// r can be a or b
-#define csub(r, a, b) r[0] = a[0] - b[0]; r[1] = a[1] - b[1];
-
-// returns a * b
-// r has to be different variable than a and b
-#define cmul(r, a, b) r[0] = a[0] * b[0] - a[1] * b[1]; r[1] = a[0] * b[1] + a[1] * b[0];
-
-// returns a * a
-// r has to be a different variable than a
-#define csqr(r, a) r[0] = a[0] * a[0] - a[1] * a[1]; r[1] = 2 * a[0] * a[1];
-
-
-// the absolute value of x, squared
-#define cabs2(x) (x[0] * x[0] + x[1] * x[1])
-#define cabs(x) sqrt(cabs2(x))
 
 #include "fr.h"
+
+#define creal(a) a.x
+#define cimag(a) a.y
+
+
+/*
+
+our complex number library, in cuda
+
+*/
+
+
+#define cabs(a) hypot(a.x*a.x, a.y*a.y)
+
+// pow, returns e**(x)
+__host__ __device__ static __inline__
+cuDoubleComplex cuCexp(cuDoubleComplex x) {
+    cuDoubleComplex result = { 0.0, 0.0 };
+    double tmp_scale = exp(x.x);
+    sincos(x.y, &result.y, &result.x);
+    result.x *= tmp_scale;
+    result.y *= tmp_scale;
+    return result;
+}
+
+// sin, returns sin(x)
+__host__ __device__ static __inline__
+cuDoubleComplex cuCsin(cuDoubleComplex x) {
+    cuDoubleComplex result = { 0.0, 0.0 };
+    double tmp_scale = exp(x.x);
+    sincos(x.y, &result.y, &result.x);
+    result.x *= tmp_scale;
+    result.y *= tmp_scale;
+    return result;
+}
+
 
 // a macro to check a result and then print out info if failed, and (possibly)
 // exit
@@ -111,45 +121,105 @@ void cuda_kernel(fr_t fr, int my_h, int my_off, unsigned char * col, int ncol, u
     py += my_off;
 
     // fractional index
-    double fri, mfact, _q;
+    double fri, mfact, _q, tmp;
 
     // real, imaginary
-    complex c = {
+    complex z, c;
+
+    c = make_cuDoubleComplex(
         fr.cX - (fr.w - 2 * px) / (fr.Z * fr.w),
         fr.cY + (fr.h - 2 * py) / (fr.Z * fr.w)
-    };
+    );
 
-    complex z;
-    cset(z, c);
-    complex tmp;
+    z = c;
 
     switch (fr.fractal_type) {
+        case FR_MANDELBROT:
+            // see above in this file, this method determines whether
+            // we should skip the computation
+            _q = (z.x - .25f);
+            _q = _q * _q + z.y * z.y;
+            if (_q * (_q + (z.x - .25f)) < z.y * z.y / 4.0f) {
+                ci = fr.max_iter;
+                fri = ci + 0.0;
+            } else {
+                for (ci = 0; ci < fr.max_iter && cabs(z) < 16.0; ++ci) {
+                    z = cuCmul(z, z);
+                    z = cuCadd(z, c);
+                }
+                tmp = log(log(creal(z)*creal(z) + cimag(z)*cimag(z)));
+                if (fr.fractal_flags & FRF_TANKTREADS) {
+                    fri = 2.0 + ci - tmp / log(2.5);
+                } else {
+                    fri = 2.0 + ci - tmp / log(2.0);
+                }
+            }
+            break;
+        case FR_MANDELBROT_3:
+            // similar to the default mandelbrot, we will loop and use
+            // an escape value of 16.0. However, we have no speedups,
+            // like bulb_check_0 for this, so we will just iterate
+            // the function
+            for (ci = 0; ci < fr.max_iter && cabs(z) <= 16.0; ++ci) {
+                z = cuCmul(z, cuCmul(z, z));
+                z = cuCadd(z, c);
+            }
 
+
+            // we use the same basic method, but with a different
+            // divisor. The divisor to get even boundaries between
+            // iteration bounds is log(3.0) (log of the exponent),
+            // however try 2.5 or 3.5 or 5 to get other, cool
+            // fractional iteration counts
+            tmp = log(log(creal(z)*creal(z) + cimag(z)*cimag(z)))
+                  / log(3.0);
+            fri = 2.0 + ci - tmp;
+            break;
+        case FR_EXP:
+            //
+            for (ci = 0; ci < fr.max_iter && abs(creal(z)) < 16.0; ++ci) {
+                z = cuCexp(z);
+                z = cuCadd(z, c);
+            }
+            // no current way to easily do a fractional iteration, so
+            // just send a fractional iteration of the actual integer
+            // value
+            fri = 0.0 + ci;
+            break;
+        case FR_SIN:
+            // the sin(z)+c may not just escape from a radius, and we
+            // should check that the imaginary portion escapes
+            for (ci = 0; ci < fr.max_iter && abs(cimag(z)) < 16.0; ++ci) {
+                z = cuCsin(z);
+                z = cuCadd(z, c);
+
+            }
+            // no current way to easily do a fractional iteration, so
+            // just send a fractional iteration of the actual integer
+            // value
+            fri = 0.0 + ci;
+            break;
         default:
+            // this should never happen
+            *err = 1;
+            return;
             break;
     }
 
-    _q = (z[0] - .25f);
-    _q = _q * _q + z[1] * z[1];
-    if (_q * (_q + (z[0] - .25f)) < z[1] * z[1] / 4.0f) {
-        ci = fr.max_iter;
-    } else {
-        for (ci = 0; ci < fr.max_iter && cabs(z) <= 16.0; ++ci) {
-            csqr(tmp, z);
-            cadd(z, tmp, c);
-        }
-    }
-
-
+    // if ci is set to default values, if they have set ci to 0 or max
+    // the computation might iter,
+    // set the fri to corresponding values
     if (ci == fr.max_iter) {
-        fri = 0.0;
-    } else {
-        fri = 2.0 + ci - log(log(cabs2(z))) / log(2.0);
+        fri = 0.0 + fr.max_iter;
     }
 
-    mfact = fri - floor(fri);
-    //
-    mfact = 0;
+    fri = fri * fr.cscale + fr.coffset;
+
+    if (fr.fractal_flags & FRF_SIMPLE) {
+        mfact = 0;
+    } else {
+        mfact = fri - floor(fri);
+    }
 
     c0 = (int)floor(fri) % ncol;
     c1 = (c0 + 1) % ncol;

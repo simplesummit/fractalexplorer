@@ -31,38 +31,70 @@ can also find a copy at http://www.gnu.org/licenses/.
 #include <SDL.h>
 #include <SDL_ttf.h>
 
-#define AXIS_MAX 32717.0f
-#define SDL_HNDL(x) res = x; if (res < 0) { log_fatal("While executing %s, SDL error: %s", #x, SDL_GetError()); }
 
-// smashes down x if abs(x) <= e
+// the normalization value of SDL axis. If a joystick is all the way forward,
+// its value will be +AXIS_MAX, if it is all the way back, it will be -AXIS_MAX
+// thus, to linearly scale between -1.0 and 1.0, divide the input by AXIS_MAX
+#define AXIS_MAX (32717.0f)
+
+
+// SDL error handling macro. if the SDL function returns an error, it prints
+// out the integer code, and prints the SDL error string for last error.
+// sdl_hndl_res is the variable used
+int sdl_hndl_res;
+#define SDL_HNDL(x) sdl_hndl_res = x; if (sdl_hndl_res < 0) {  \
+  log_error("While executing %s, SDL error (code %d): %s", #x, sdl_hndl_res, SDL_GetError()); exit(0); \
+}
+
+// this 'smashes' x down to 0 if abs(x)<(e), or just evaluates to x
 #define SMASH(x, e) ((int)floor(((x) <= (e) && (x) >= -(e)) ? (0) : (x)))
-#define FONT_SIZE    30
 
+// the font size for SDL rendering. Eventually (possibly) this should be
+// relative to window size
+#define FONT_SIZE           30
+
+
+// the last full-cycle FPS (what the user sees)
 double last_fps = 0.0;
+
+// stores the ratio of compressed data to expanded data
 double compress_rate = 0.0;
 
+// to store timing and performance data (see fr.h for this type)
 tperf_t tperf_render;
 
-//unsigned int prog, texture;
-
+// an RGBA array of pixels to read in from compute nodes
 unsigned char * pixels;
 
+// a global hash, so we know whether to update the fractal
 unsigned int hash;
 
-int res;
+// the previous x and y coordinates
+double last_x, last_y;
 
-float last_x, last_y;
-
-
+// whether or not we are currently using a joystick
 #define USE_JOYSTICK ((joystick) != NULL)
 
+// event to loop through with SDL_PollEvent
 SDL_Event cevent;
 
+// a pointer to a joystick
 SDL_Joystick *joystick = NULL;
 
 
-SDL_GameControllerAxis horiz = 0, vert = 1, zaxis = 3;
+// joystick axis numbers, should be found out using joytest or similar programs
+// these were found for the Logitech DualAction
+#define CONTROLLER_HORIZONTAL_AXIS      0
+#define CONTROLLER_VERTICAL_AXIS        1
+#define CONTROLLER_ZOOM_AXIS            3
 
+// typed axis ids
+SDL_GameControllerAxis horiz = CONTROLLER_HORIZONTAL_AXIS,
+                       vert = CONTROLLER_VERTICAL_AXIS,
+                       zaxis = CONTROLLER_ZOOM_AXIS;
+
+
+// pointer to SDL render structures to use
 SDL_Window *window;
 SDL_Surface *surface;
 SDL_Surface *screen;
@@ -70,42 +102,51 @@ TTF_Font *font;
 SDL_Surface * tsurface;
 SDL_Rect offset;
 
-
+// this is the color of the info text at the top left of the screen
 SDL_Color text_color = { 255, 255, 255 };
 
-
+// the message lengths for strings
 #define MAX_ONSCREEN_MESSAGE   (100 + 10 * 4)
 #define NUM_ONSCREEN_MESSAGE   (4)
+
+// pointer to onscreen message strings
 char ** onscreen_message = NULL;
 
 
-//int last_bt;
-
-//void async_draw(int);
-
+// hash function to determine whether fr has changed
 unsigned int hash_fr(fr_t fr) {
     return (int)floor( fr.Z + fr.w * (fr.h + fr.Z) - fr.cX - fr.cY + sin(fr.cX + fr.Z * fr.cY / fr.w) + fr.h);
 }
 
+// requests picture from compute nodes
 void gather_picture() {
+    // timing structures
     tperf_t tp_bc, tp_rv;
+    // pe is how much should be computed by each worker
     int i, pe = fr.h / fr.num_workers;
-    unsigned char * naddr, * cmp_bytes = (unsigned char *)malloc(LZ4_compressBound(fr.mem_w * pe));
+    // naddr never points to its own memory, just as an offset to the global
+    // pixels array. Thus, free() should never be called with naddr
+    unsigned char * naddr,
+    // cmp_bytes
+                  * cmp_bytes = (unsigned char *)malloc(LZ4_compressBound(fr.mem_w * pe));
     int nbytes, cmp_nbytes;
 
+    // we use this for printing out statistics
     double total_bytes = 0, total_compressed_bytes = 0;
 
     C_TIME(tp_bc,
     MPI_Bcast(&fr, 1, mpi_fr_t, 0, MPI_COMM_WORLD);
     )
+
     C_TIME(tp_rv,
+    // loop through all workers
     for (i = 1; i <= fr.num_workers; ++i) {
+        // get the offset into the final
         naddr = pixels + pe * fr.mem_w * (i - 1);
         nbytes = fr.mem_w * pe;
 
         MPI_Recv(&cmp_nbytes, 1, MPI_INT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         log_trace("recv from %d (compressed), size: %d", i, cmp_nbytes);
-        cmp_bytes = (unsigned char *)malloc(cmp_nbytes);
         MPI_Recv(cmp_bytes, cmp_nbytes, MPI_UNSIGNED_CHAR, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
         LZ4_decompress_safe((char *)cmp_bytes, (char*)naddr, cmp_nbytes, nbytes);
@@ -117,10 +158,11 @@ void gather_picture() {
     compress_rate = total_compressed_bytes / total_bytes;
     memcpy(surface->pixels, pixels, fr.mem_w * fr.h);
     //log_trace("MPI_Bcast(fr) fps: %lf", 1.0 / tp_bc.elapsed_s);
+    // print out debug info
     log_trace("MPI_Recv(pixels) fps: %lf", 1.0 / tp_rv.elapsed_s);
 }
 
-
+// refreshes the whole window, recalculating if needed
 void window_refresh() {
     if (hash == hash_fr(fr)) {
         return;
@@ -131,7 +173,7 @@ void window_refresh() {
 
     C_TIME(tp_wr,
     if (pixels == NULL) {
-        log_debug("remallocing render pixels");
+        log_debug("malloc'ing render pixels");
         if (pixels != NULL) {
             //free(pixels);
         }
@@ -146,6 +188,7 @@ void window_refresh() {
 
     draw();
 
+    // first time through, allocated enough messages
     if (onscreen_message == NULL) {
         onscreen_message = malloc(NUM_ONSCREEN_MESSAGE * sizeof(char *));
         int i;
@@ -153,6 +196,7 @@ void window_refresh() {
             onscreen_message[i] = malloc(MAX_ONSCREEN_MESSAGE);
         }
     }
+    // onscreen messages
     sprintf(onscreen_message[0], "fps: %2.1lf", last_fps);
     sprintf(onscreen_message[1], "compression rate: %1.2lf", compress_rate);
 
@@ -160,26 +204,30 @@ void window_refresh() {
     SDL_HNDL(SDL_BlitSurface(tsurface, NULL, screen, &offset));
     offset.y += FONT_SIZE;
     tsurface = TTF_RenderText_Solid(font, onscreen_message[1], text_color);
+
+    // upload the pixels to the surface
     SDL_HNDL(SDL_BlitSurface(tsurface, NULL, screen, &offset));
 
+    // do a screen refresh
     SDL_HNDL(SDL_UpdateWindowSurface(window));
-    //glTexImage2D(GL_TEXTURE_2D, 0, GL_BGRA, fr.w, fr.h, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, pixels);
-    //glutSwapBuffers();
-
     )
+    // print out debug info
     log_info("window_refresh() fps: %lf", 1.0 / tp_wr.elapsed_s);
     last_fps = 1.0 / tp_wr.elapsed_s;
     //draw();
 }
 
 
+// our main method
 void fractalexplorer_render(int * argc, char ** argv) {
 
+    // SDL initialization
     if (SDL_Init(SDL_INIT_JOYSTICK | SDL_INIT_VIDEO)) {
         log_fatal("Could not initialize SDL: %s", SDL_GetError());
         exit(1);
     }
 
+    // make sure to quit and shut down libraries
     atexit(SDL_Quit);
 
     int __res = 0;
@@ -188,12 +236,23 @@ void fractalexplorer_render(int * argc, char ** argv) {
         exit(1);
     }
 
+    // make sure to quit and shut down TTF libraries
     atexit(TTF_Quit);
 
-    font = TTF_OpenFont("UbuntuMono.ttf", FONT_SIZE);
+    // try to open our default font
+    font = TTF_OpenFont("UbuntuMono-R.ttf", FONT_SIZE);
     if (font == NULL) {
-        log_error("TTF_OpenFont() Failed: %s", TTF_GetError());
-        exit(1);
+        log_debug("TTF_OpenFont(UbuntuMono-R.ttf) Failed: %s", TTF_GetError());
+        font = TTF_OpenFont("Ubuntu-R.ttf", FONT_SIZE);
+        if (font == NULL) {
+            log_debug("TTF_OpenFont(Ubuntu-R.ttf) Failed: %s", TTF_GetError());
+            font = TTF_OpenFont("UbuntuMono.ttf", FONT_SIZE);
+            if (font == NULL) {
+                log_debug("TTF_OpenFont(UbuntuMono.ttf) Failed: %s", TTF_GetError());
+                log_fatal("Could not find a suitable font!");
+                exit(1);
+            }
+        }
     }
 
     log_debug("%i joysticks were found, using joystick[0]\n\n", SDL_NumJoysticks());

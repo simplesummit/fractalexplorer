@@ -19,12 +19,14 @@ can also find a copy at http://www.gnu.org/licenses/.
 
 #include "fractalexplorer.h"
 #include "calc_c.h"
+#include <math.h>
+#include <complex.h>
 
 // type generic math macros, which finds the correct function based on input.
 // this slows down compile time at the preprocessing step, and this should be
 // removed and instead use `complex.h` with cabs, csin, and similarly named
 // functions
-#include "tgmath.h"
+//#include "tgmath.h"
 
 
 // a macro to scale between values. when F = 0, MIX macro takes the
@@ -152,7 +154,7 @@ void calc_c(fr_t fr, int my_h, int my_off, unsigned char * output) {
                         // however, this leads to some visual artifacts and
                         // should be kept >= 4.0, with 16.0 further reducing
                         // visual imperfections
-                        for (ci = 0; ci < fr.max_iter && abs(z) <= 16.0; ++ci) {
+                        for (ci = 0; ci < fr.max_iter && cabs(z) <= 16.0; ++ci) {
 
                             // this is the standard function, z = z ** 2 + c
                             z = z * z + c;
@@ -186,7 +188,7 @@ void calc_c(fr_t fr, int my_h, int my_off, unsigned char * output) {
                     // an escape value of 16.0. However, we have no speedups,
                     // like bulb_check_0 for this, so we will just iterate
                     // the function
-                    for (ci = 0; ci < fr.max_iter && abs(z) <= 16.0; ++ci) {
+                    for (ci = 0; ci < fr.max_iter && cabs(z) <= 16.0; ++ci) {
                         z = z * z * z + c;
                     }
 
@@ -201,8 +203,8 @@ void calc_c(fr_t fr, int my_h, int my_off, unsigned char * output) {
                     break;
                 case FR_EXP:
                     //
-                    for (ci = 0; ci < fr.max_iter && abs(creal(z)) < 16.0; ++ci) {
-                        z = exp(z) + c;
+                    for (ci = 0; ci < fr.max_iter && fabs(creal(z)) < 16.0; ++ci) {
+                        z = cexp(z) + c;
                     }
                     // no current way to easily do a fractional iteration, so
                     // just send a fractional iteration of the actual integer
@@ -212,8 +214,8 @@ void calc_c(fr_t fr, int my_h, int my_off, unsigned char * output) {
                 case FR_SIN:
                     // the sin(z)+c may not just escape from a radius, and we
                     // should check that the imaginary portion escapes
-                    for (ci = 0; ci < fr.max_iter && abs(cimag(z)) < 16.0; ++ci) {
-                        z = sin(z) + c;
+                    for (ci = 0; ci < fr.max_iter && fabs(cimag(z)) < 16.0; ++ci) {
+                        z = csin(z) + c;
                     }
                     // no current way to easily do a fractional iteration, so
                     // just send a fractional iteration of the actual integer
