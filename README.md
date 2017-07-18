@@ -73,7 +73,11 @@ It includes `configure`, so you don't need autotools to install the program once
 ## FAQS/Common Problems
 
 Q: During compilation, the compiler complains that `LZ4_compress_default` is undefined/unresolved. How to fix?
+
 A: You either haven't installed LZ4, or have an improper version (even Ubuntu repositories carry old versions). Install using [this tarball](https://github.com/lz4/lz4/archive/v1.7.5.tar.gz).
 
+
+
 Q: I'm getting an error that wasn't listed in this section, how do I troubleshoot?
+
 A: Use fractalexplorer's verbose setting: add `-v5` to the argument list when running, and much more info will be printed. Paste the entire program log with `-v5` to [hastebin](https://hastebin.com/) or a similar site, and open up an [issue](https://github.com/ornl-leconte/fractalexplorer/issues/new), describe your problem and link the program output.
