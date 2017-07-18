@@ -18,7 +18,7 @@
 
 
 AC_PREREQ([2.55])
-AC_INIT([fractalexplorer], [0.1.0], [cade@cade.site])
+AC_INIT([fractalexplorer], [0.1.1], [cade@cade.site])
 
 AC_CONFIG_MACRO_DIRS([custom_m4])
 

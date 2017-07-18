@@ -71,11 +71,13 @@ int engine = E_C;
 char * csch = "green";
 
 void mandelbrot_show_help() {
-    printf("Usage: mandelbrot [-h]\n");
+    printf("Usage: " PACKAGE " [-h]\n");
     printf("  -h             show this help menu\n");
     printf("  -v[N]          set verbosity (1...5)\n");
     printf("  -N[N]          set width\n");
     printf("  -M[N]          set height\n");
+    printf("  -E[F]          set color index offset\n");
+    printf("  -G[F]          set color index multiplyer\n");
     printf("  -F             use fullscreen\n");
     printf("  -i[N]          set iterations\n");
     printf("  -x[F]          set center x\n");
@@ -85,19 +87,21 @@ void mandelbrot_show_help() {
     printf("  -k[N]          set number of colors\n");
     printf("  -e[S]          set engine\n");
     printf("\n");
+    printf(PACKAGE " version: " PACKAGE_VERSION "\n");
+    printf("\n");
     printf("Questions? Issues? Please contact:\n");
-    printf("<brownce@ornl.gov>\n");
+    printf("<" PACKAGE_BUGREPORT ">\n");
 }
 
 // returns exit code, or -1 if we shouldn't exit
 int parse_args(int argc, char ** argv) {
     char c;
-    while ((c = getopt(argc, argv, "v:N:M:i:e:k:x:y:z:c:Fh")) != GETOPT_STOP) {
+    while ((c = getopt(argc, argv, "v:N:M:E:G:i:e:k:x:y:z:c:Fh")) != GETOPT_STOP) {
 	switch (c) {
         case 'h':
-		    mandelbrot_show_help();
-		    return 0;
-		    break;
+    		    mandelbrot_show_help();
+    		    return 0;
+    		    break;
         case 'v':
             log_set_level(atoi(optarg));
             break;
@@ -124,6 +128,12 @@ int parse_args(int argc, char ** argv) {
             break;
         case 'c':
             csch = optarg;
+            break;
+        case 'E':
+            fr.coffset = atof(optarg);
+            break;
+        case 'G':
+            fr.cscale = atof(optarg);
             break;
         case 'k':
             col.num = atoi(optarg);
@@ -170,7 +180,7 @@ int main(int argc, char ** argv) {
     fr.Z = 1;
     fr.coffset = 0;
     fr.cscale = 1.0;
-    fr.max_iter = 20;
+    fr.max_iter = 100;
     fr.w = 640;
     fr.h = 480;
 
