@@ -26,9 +26,6 @@ extern "C" {
 #include <stdio.h>
 #include <stdlib.h>
 
-typedef cuDoubleComplex complex;
-
-
 #include "fr.h"
 
 #define creal(a) a.x
@@ -43,6 +40,9 @@ our complex number library, in cuda
 
 
 #define cabs(a) hypot(a.x*a.x, a.y*a.y)
+#define cabs2(a) (a.x*a.x+a.y*a.y)
+#define ccreate(x, y) ((cuDoubleComplex){ (x), (y) })
+
 
 // pow, returns e**(x)
 __host__ __device__ static __inline__
@@ -55,17 +55,52 @@ cuDoubleComplex cuCexp(cuDoubleComplex x) {
     return result;
 }
 
+// 1 / x
+__host__ __device__ static __inline__
+cuDoubleComplex cuCrec(cuDoubleComplex x) {
+    double to_scale = cabs2(x);
+    return ccreate(x.x / to_scale, -x.y / to_scale);
+}
+
 // natural logarithm, base e ~= 2.71828
 __host__ __device__ static __inline__
 cuDoubleComplex cuClog(cuDoubleComplex x) {
-    cuDoubleComplex result = { 0.0, 0.0 };
-    result.x = log(x.x * x.x + x.y * x.y) / 2.0;
-    result.y = atan2(x.y, x.x);
-    return result;
+    return ccreate(log(cabs2(x)) / 2.0, atan2(x.y, x.x));
 }
 
+// log_y(x), or log base y of x
 __host__ __device__ static __inline__
 cuDoubleComplex cuClogb(cuDoubleComplex x, cuDoubleComplex y) {
+    return cuCdiv(cuClog(x), cuClog(y));
+}
+
+// x * x, or x ** 2, x squared
+__host__ __device__ static __inline__
+cuDoubleComplex cuCsqr(cuDoubleComplex x) {
+    return ccreate(x.x*x.x - x.y*x.y, 2 * x.x*x.y);
+}
+
+// x ** y, but optimized for integers
+__host__ __device__ static __inline__
+cuDoubleComplex cuCpowi(cuDoubleComplex x, int y) {
+    bool is_neg_pow = y < 0;
+    y = abs(y);
+    // holds track of x^{2^{exp bit}}
+    cuDoubleComplex xt2eb = x, result = ccreate(1, 0);
+    while (y > 0) {
+        if (y & 1) {
+            result = cuCmul(result, xt2eb);
+        }
+        xt2eb = cuCsqr(xt2eb);
+        y >>= 1;
+    }
+    return (is_neg_pow) ? cuCrec(result) : result;
+}
+
+
+// x ** y, or x to the y power
+__host__ __device__ static __inline__
+cuDoubleComplex cuCpow(cuDoubleComplex x, cuDoubleComplex y) {
     return cuCexp(cuCmul(cuClog(x), y));
 }
 
@@ -73,10 +108,7 @@ cuDoubleComplex cuClogb(cuDoubleComplex x, cuDoubleComplex y) {
 // correct for all complex numbers
 __host__ __device__ static __inline__
 cuDoubleComplex cuCsin(cuDoubleComplex x) {
-    cuDoubleComplex result = { 0.0, 0.0 };
-    result.x = sin(x.x) * cosh(x.y);
-    result.y = cos(x.x) * sinh(x.y);
-    return result;
+    return ccreate(sin(x.x) * cosh(x.y), cos(x.x) * sinh(x.y));
 }
 
 
@@ -84,9 +116,7 @@ cuDoubleComplex cuCsin(cuDoubleComplex x) {
 // works for complex numbers
 __host__ __device__ static __inline__
 cuDoubleComplex cuCcos(cuDoubleComplex x) {
-    cuDoubleComplex result = { 0.0, 0.0 };
-    result.x = cos(x.x) * cos(x.y);
-    result.y = -sin(x.x) * sinh(x.y);
+    return ccreate(cos(x.x) * cosh(x.y), -sin(x.x) * sinh(x.y));
 }
 
 
@@ -147,9 +177,9 @@ void cuda_kernel(fr_t fr, int my_h, int my_off, unsigned char * col, int ncol, u
     double fri, mfact, _q, tmp;
 
     // real, imaginary
-    complex z, c;
+    cuDoubleComplex z, c;
 
-    c = make_cuDoubleComplex(
+    c = ccreate(
         fr.cX - (fr.w - 2 * px) / (fr.Z * fr.w),
         fr.cY + (fr.h - 2 * py) / (fr.Z * fr.w)
     );
@@ -167,10 +197,10 @@ void cuda_kernel(fr_t fr, int my_h, int my_off, unsigned char * col, int ncol, u
                 fri = ci + 0.0;
             } else {
                 for (ci = 0; ci < fr.max_iter && cabs(z) < 16.0; ++ci) {
-                    z = cuCmul(z, z);
+                    z = cuCsqr(z);
                     z = cuCadd(z, c);
                 }
-                tmp = log(log(creal(z)*creal(z) + cimag(z)*cimag(z)));
+                tmp = log(log(cabs2(z)));
                 if (fr.fractal_flags & FRF_TANKTREADS) {
                     fri = 2.0 + ci - tmp / log(2.5);
                 } else {
@@ -200,7 +230,7 @@ void cuda_kernel(fr_t fr, int my_h, int my_off, unsigned char * col, int ncol, u
             break;
         case FR_EXP:
             //
-            for (ci = 0; ci < fr.max_iter && abs(creal(z)) < 16.0; ++ci) {
+            for (ci = 0; ci < fr.max_iter && fabs(creal(z)) < 16.0; ++ci) {
                 z = cuCexp(z);
                 z = cuCadd(z, c);
             }
@@ -212,7 +242,7 @@ void cuda_kernel(fr_t fr, int my_h, int my_off, unsigned char * col, int ncol, u
         case FR_SIN:
             // the sin(z)+c may not just escape from a radius, and we
             // should check that the imaginary portion escapes
-            for (ci = 0; ci < fr.max_iter && abs(cimag(z)) < 16.0; ++ci) {
+            for (ci = 0; ci < fr.max_iter && fabs(cimag(z)) < 16.0; ++ci) {
                 z = cuCsin(z);
                 z = cuCadd(z, c);
 
