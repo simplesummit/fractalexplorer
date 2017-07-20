@@ -98,9 +98,12 @@ SDL_GameControllerAxis horiz = CONTROLLER_HORIZONTAL_AXIS,
 SDL_Window *window;
 SDL_Surface *surface;
 SDL_Surface *screen;
+SDL_Texture *texture;
 TTF_Font *font;
 SDL_Surface * tsurface;
 SDL_Rect offset;
+SDL_Renderer * renderer;
+
 
 // this is the color of the info text at the top left of the screen
 SDL_Color text_color = { 255, 255, 255 };
@@ -120,8 +123,6 @@ unsigned int hash_fr(fr_t fr) {
 
 // requests picture from compute nodes
 void gather_picture() {
-    // timing structures
-    tperf_t tp_bc, tp_rv;
     // pe is how much should be computed by each worker
     int i, pe = fr.h / fr.num_workers;
     // naddr never points to its own memory, just as an offset to the global
@@ -134,33 +135,41 @@ void gather_picture() {
     // we use this for printing out statistics
     double total_bytes = 0, total_compressed_bytes = 0;
 
-    C_TIME(tp_bc,
     MPI_Bcast(&fr, 1, mpi_fr_t, 0, MPI_COMM_WORLD);
-    )
 
-    C_TIME(tp_rv,
+    tperf_t tp_recv, tp_decompress;
+    double s_recv = 0, s_decompress = 0;
+ 
     memset(pixels, 0, fr.mem_w * fr.h);
     // loop through all workers
     for (i = 1; i <= fr.num_workers; ++i) {
         // get the offset into the final
         naddr = pixels + pe * fr.mem_w * (i - 1);
         nbytes = fr.mem_w * pe;
-
+        C_TIME(tp_recv,
+        // if a negative value is sent back, no compression is used
         MPI_Recv(&cmp_nbytes, 1, MPI_INT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        log_trace("recv from %d (compressed), size: %d", i, cmp_nbytes);
-        MPI_Recv(cmp_bytes, cmp_nbytes, MPI_UNSIGNED_CHAR, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-        LZ4_decompress_safe((char *)cmp_bytes, (char*)naddr, cmp_nbytes, nbytes);
-        log_trace("%%%lf of final size (worker %d)", 100.0 * cmp_nbytes / nbytes, i);
+        //log_trace("recv from %d (compressed), size: %d", i, cmp_nbytes);
+        MPI_Recv(cmp_bytes, abs(cmp_nbytes), MPI_UNSIGNED_CHAR, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        )
+        C_TIME(tp_decompress,
+        if (cmp_nbytes > 0) {
+            LZ4_decompress_safe((char *)cmp_bytes, (char*)naddr, abs(cmp_nbytes), nbytes);
+        } else {
+            memcpy(naddr, cmp_bytes, abs(cmp_nbytes));
+        }
+        )
+        //log_trace("%%%lf of final size (worker %d)", 100.0 * cmp_nbytes / nbytes, i);
+        s_recv += tp_recv.elapsed_s;
+        s_decompress += tp_decompress.elapsed_s;
         total_bytes += nbytes;
-        total_compressed_bytes += cmp_nbytes;
+        total_compressed_bytes += abs(cmp_nbytes);
     }
-    )
     compress_rate = total_compressed_bytes / total_bytes;
-    memcpy(surface->pixels, pixels, fr.mem_w * fr.h);
-    //log_trace("MPI_Bcast(fr) fps: %lf", 1.0 / tp_bc.elapsed_s);
+    log_debug("recv tfps: %.2lf, decompress tfps: %.2lf, compression ratio: %.2lf", 1.0 / s_recv, 1.0 / s_decompress, compress_rate);
+    //memcpy(surface->pixels, pixels, fr.mem_w * fr.h);
+//log_trace("MPI_Bcast(fr) fps: %lf", 1.0 / tp_bc.elapsed_s);
     // print out debug info
-    log_trace("MPI_Recv(pixels) fps: %lf", 1.0 / tp_rv.elapsed_s);
 }
 
 // refreshes the whole window, recalculating if needed
@@ -168,13 +177,15 @@ void window_refresh() {
     if (hash == hash_fr(fr)) {
         return;
     }
-    tperf_t tp_wr;
+    tperf_t tp_wr, tp_gp, tp_draw, tp_textdraw;
 
     offset = (SDL_Rect){0, 0, 0, 0};
 
+    screen = SDL_GetWindowSurface(window);
+    
     C_TIME(tp_wr,
     if (pixels == NULL) {
-        log_debug("malloc'ing render pixels");
+        log_trace("malloc'ing render pixels");
         if (pixels != NULL) {
             //free(pixels);
         }
@@ -184,10 +195,18 @@ void window_refresh() {
 
 
     // GET PIXEL DATA HERE
+    C_TIME(tp_gp,
     gather_picture();
     //mand_c(fr.w, fr.h, fr.cX, fr.cY, fr.Z, fr.max_iter, pixels);
+    )
 
-    draw();
+    C_TIME(tp_draw,
+    SDL_UpdateTexture(texture, NULL, pixels, fr.mem_w);
+    SDL_RenderClear(renderer);
+    SDL_RenderCopy(renderer, texture, NULL, NULL);
+    SDL_RenderPresent(renderer);
+//    SDL_HNDL(SDL_BlitSurface(surface, NULL, screen, NULL));
+    )
 
     // first time through, allocated enough messages
     if (onscreen_message == NULL) {
@@ -200,22 +219,28 @@ void window_refresh() {
     // onscreen messages
     sprintf(onscreen_message[0], "fps: %2.1lf", last_fps);
     sprintf(onscreen_message[1], "compression rate: %1.2lf", compress_rate);
+    
+    C_TIME(tp_textdraw,/*
+    int i;
+    for (i = 0; i < 2; ++i) {
+        tsurface = TTF_RenderText_Solid(font, onscreen_message[i], text_color);
+        SDL_HNDL(SDL_BlitSurface(tsurface, NULL, screen, &offset));
+        offset.y += FONT_SIZE;
+    }*/
+    )
+    //tsurface = TTF_RenderText_Solid(font, onscreen_message[1], text_color);
+    //SDL_HNDL(SDL_BlitSurface(tsurface, NULL, screen, &offset));
+     
 
-    tsurface = TTF_RenderText_Solid(font, onscreen_message[0], text_color);
-    SDL_HNDL(SDL_BlitSurface(tsurface, NULL, screen, &offset));
-    offset.y += FONT_SIZE;
-    tsurface = TTF_RenderText_Solid(font, onscreen_message[1], text_color);
-
-    // upload the pixels to the surface
-    SDL_HNDL(SDL_BlitSurface(tsurface, NULL, screen, &offset));
+     //SDL_HNDL(SDL_BlitSurface(surface, NULL, screen, &offset));
 
     // do a screen refresh
-    SDL_HNDL(SDL_UpdateWindowSurface(window));
+    //SDL_HNDL(SDL_UpdateWindowSurface(window));
     )
     // print out debug info
-    log_info("window_refresh() fps: %lf", 1.0 / tp_wr.elapsed_s);
+    log_info("fps: %.2lf, gather_picture() fps: %.2lf, draw fps: %.2lf text draw fps: %.2lf", 1.0 / tp_wr.elapsed_s, 1.0 / tp_gp.elapsed_s, 1.0 / tp_draw.elapsed_s, 1.0 / tp_textdraw.elapsed_s);
     last_fps = 1.0 / tp_wr.elapsed_s;
-    //draw();
+
 }
 
 
@@ -273,7 +298,7 @@ void fractalexplorer_render(int * argc, char ** argv) {
         log_info("not using joystick");
     }
 
-
+    
     window = SDL_CreateWindow("Mandelbrot Render", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, fr.w, fr.h, 0);
     if (fr.w == 0 || fr.h == 0 || use_fullscreen) {
         SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP); // SDL_WINDOW_FULLSCREEN_DESKTOP, or SDL_WINDOW_FULLSCREEN
@@ -281,16 +306,25 @@ void fractalexplorer_render(int * argc, char ** argv) {
     // in case fullscreen changes it
     SDL_GetWindowSize(window, &fr.w, &fr.h);
 
-    screen = SDL_GetWindowSurface(window);
+//    screen = SDL_GetWindowSurface(window);
 
-    surface = SDL_CreateRGBSurface(SDL_SWSURFACE, fr.w, fr.h, 32, 0xFF, 0xFF00, 0xFF0000, 0xFF000000);
+   // surface = SDL_CreateRGBSurface(SDL_SWSURFACE, fr.w, fr.h, 32, 0xFF, 0xFF00, 0xFF0000, 0xFF000000);
+    renderer = SDL_CreateRenderer(window, -1, 0);
 
 
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+    SDL_RenderClear(renderer);
+    SDL_RenderPresent(renderer);
+    
+
+    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, fr.w, fr.h);
+    
+    /*
     if (surface == NULL) {
         log_error("SDL failed to create surface: %s", SDL_GetError());
     }
-
-    fr.mem_w = surface->pitch;
+    */
+    fr.mem_w = 4 * fr.w;
 
     window_refresh();
 
@@ -464,8 +498,4 @@ void fractalexplorer_render(int * argc, char ** argv) {
     exit(0);
 }
 
-void draw() {
-    screen = SDL_GetWindowSurface(window);
 
-    SDL_HNDL(SDL_BlitSurface(surface, NULL, screen, NULL));
-}

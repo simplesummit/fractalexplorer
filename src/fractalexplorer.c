@@ -188,7 +188,7 @@ int main(int argc, char ** argv) {
     fr.fractal_type = FR_MANDELBROT;
 
     // see fr.h for more  flags
-    fr.fractal_flags = FRF_NONE | FRF_SIMPLE;// | FRF_TANKTREADS;//;
+    fr.fractal_flags = FRF_NONE;// | FRF_SIMPLE;// | FRF_TANKTREADS;//;
 
     col.num = 20;
 
@@ -302,7 +302,7 @@ void start_compute() {
     int cmp_size = 0, max_cmp_size = 0;
     int lmcs = 0;
 
-    tperf_t tp_sc, tp_ms;
+    tperf_t tp_compute, tp_compress, tp_send;
     /*
     log_debug("engine C");
     mand_c_init();
@@ -322,6 +322,8 @@ void start_compute() {
 #else
 #define CUDA_EXEC log_fatal("wasn't compiled with CUDA support"); M_EXIT(1);
 #endif
+
+    bool do_compress = true;
 
     while (true) {
         MPI_Bcast(&fr, 1, mpi_fr_t, 0, MPI_COMM_WORLD);
@@ -347,11 +349,12 @@ void start_compute() {
             pixels_cmp = (unsigned char *)malloc(max_cmp_size);
         }
         memset(pixels, 0, fr.mem_w * my_h);
-        C_TIME(tp_sc,
+        C_TIME(tp_compute,
             if (engine == E_C) {
                 log_trace("mand_c starting");
                 calc_c(fr, my_h, my_off, pixels);
             } else if (engine == E_CUDA) {
+                log_trace("mand_cuda starting");
                 CUDA_EXEC
             } else {
                 log_error("Unknown engine");
@@ -361,18 +364,26 @@ void start_compute() {
             //scanline(pixels, fr.w, 0);
         )
 
-        log_debug("computation fps: %lf", 1.0 / tp_sc.elapsed_s);
 
-        C_TIME(tp_ms,
+        C_TIME(tp_compress,
         //log_trace("sending pixels back, hash: %d", nhsh(pixels, fr.mem_w * my_h));
-          cmp_size = LZ4_compress_default((char *)pixels, (char *)pixels_cmp, my_h * fr.mem_w, max_cmp_size);
-          if (cmp_size <= 0) {
-            log_error("error in compression function: %d", cmp_size);
-          }
-          MPI_Send(&cmp_size, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
-	        MPI_Send(pixels_cmp, cmp_size, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
-        )
+        if (do_compress) {
+            cmp_size = LZ4_compress_default((char *)pixels, (char *)pixels_cmp, my_h * fr.mem_w, max_cmp_size);
+            if (cmp_size <= 0) {
+               log_error("error in compression function: %d", cmp_size);
+            }
+        } else {
+            cmp_size = -my_h * fr.mem_w;
+            memcpy(pixels_cmp, pixels, abs(cmp_size));
         }
+        )
+        
+        C_TIME(tp_send,
+          MPI_Send(&cmp_size, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
+	  MPI_Send(pixels_cmp, cmp_size, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
+        }
+        )
+        log_debug("compute fps: %.2lf, compress fps: %.2lf, send fps: %.2lf", 1.0 / tp_compute.elapsed_s, 1.0 / tp_compress.elapsed_s, 1.0 / tp_send.elapsed_s);
         lmcs = max_cmp_size;
         fr_last = fr;
         has_ran = true;
