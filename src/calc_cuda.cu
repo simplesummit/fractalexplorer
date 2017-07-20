@@ -27,6 +27,7 @@ extern "C" {
 #include <stdlib.h>
 
 #include "fr.h"
+#include "log.h"
 
 #define creal(a) a.x
 #define cimag(a) a.y
@@ -126,7 +127,7 @@ cuDoubleComplex cuCcos(cuDoubleComplex x) {
 
 inline void gpuAssert(cudaError_t code, const char *file, int line) {
    if (code != cudaSuccess) {
-      fprintf(stderr, "GPUassert (at %s:%d) (code %d): %s\n", file, line, code,
+      log_error("GPUassert (at %s:%d) (code %d): %s\n", file, line, code,
                       cudaGetErrorString(code));
 
       // TODO: determine when to exit. Some kernel launch failures seem to be
@@ -292,17 +293,27 @@ void calc_cuda_init(fr_col_t col) {
     if (!cuda_has_init) {
         colnum = col.num;
         gpuErrchk(cudaMalloc((void **)&_gpu_err, sizeof(int)));
+        int gpu_err_start = 0;
+        gpuErrchk(cudaMemcpy(_gpu_err, &gpu_err_start, sizeof(int), cudaMemcpyHostToDevice));
         gpuErrchk(cudaMalloc((void **)&_gpu_col, 4 * colnum));
         gpuErrchk(cudaMemcpy(_gpu_col, col.col, 4 * colnum, cudaMemcpyHostToDevice));
         cuda_has_init = true;
     }
 }
 
+
+// returns the grid from a block value such that b * grid_from_block(a, b) >= a,
+// and grid_from_block(a, b) % b == 0
+int grid_from_block(int a, int b) {
+    return a / b + (a % b != 0);
+}
+
 void calc_cuda(fr_t fr, fr_col_t col, int my_h, int my_off, unsigned char * output) {
     calc_cuda_init(col);
 
-    dim3 dimBlock(4, 4);
-    dim3 dimGrid(fr.w / 4, my_h / 4);
+    dim3 dimBlock(16, 16);
+    dim3 dimGrid(grid_from_block(fr.w,  dimBlock.x), 
+                 grid_from_block(my_h, dimBlock.y));
 
 
     if (lw != fr.mem_w || lh != my_h) {
@@ -312,6 +323,7 @@ void calc_cuda(fr_t fr, fr_col_t col, int my_h, int my_off, unsigned char * outp
         gpuErrchk(cudaMalloc((void **)&_gpu_output, fr.mem_w * my_h));
     }
 
+    log_debug("cuda kernel launched at center: %f%+f, zoom: %lf, iter: %d with grid: (%d,%d), block (%d,%d)", fr.cX, fr.cY, fr.Z, fr.max_iter, dimGrid.x, dimGrid.y, dimBlock.x, dimBlock.y);
 
     // we dont need cudaMalloc(), because of ZEROcopy buffers that the GPU and CPU can share sys memory
     cuda_kernel<<<dimGrid, dimBlock>>>(fr, my_h, my_off, _gpu_col, colnum, _gpu_output, _gpu_err);
@@ -326,7 +338,7 @@ void calc_cuda(fr_t fr, fr_col_t col, int my_h, int my_off, unsigned char * outp
     gpuErrchk(cudaMemcpy(&res_err, _gpu_err, sizeof(int), cudaMemcpyDeviceToHost));
 
     if (res_err != 0) {
-        fprintf(stderr, "result from cuda kernel is non-zero: %d\n", res_err);
+        log_error("result from cuda kernel is non-zero: %d\n", res_err);
     }
 
     lw = fr.mem_w;

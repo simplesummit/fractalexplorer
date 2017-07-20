@@ -30,7 +30,6 @@ can also find a copy at http://www.gnu.org/licenses/.
 #ifndef __LOG_H__
 #define __LOG_H__
 
-#include "fractalexplorer.h"
 
 typedef void (*log_LockFn)(void *udata, int lock);
 
