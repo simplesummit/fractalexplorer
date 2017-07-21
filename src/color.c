@@ -25,7 +25,7 @@ can also find a copy at http://www.gnu.org/licenses/.
 #include "fr.h"
 #include "math.h"
 
-// color schemes are: RGBA
+// color schemes are: BGRA
 
 
 // creates a scanline, a straight white line across the screen at h pixels
@@ -42,9 +42,9 @@ void scanline(unsigned char * out, int w, int h) {
 
 // red color scheme (linear scale)
 void setcol__red(fr_col_t col, int ri, int i, float v) {
-    col.col[ri + 0] = (int)floor(255 * v);
+    col.col[ri + 0] = 0;
     col.col[ri + 1] = 0;
-    col.col[ri + 2] = 0;
+    col.col[ri + 2] = (int)floor(255 * v);
     col.col[ri + 3] = 255;
 }
 
@@ -58,9 +58,9 @@ void setcol__green(fr_col_t col, int ri, int i, float v) {
 
 // blue color scheme (linear scale)
 void setcol__blue(fr_col_t col, int ri, int i, float v) {
-    col.col[ri + 0] = 0;
+    col.col[ri + 0] = (int)floor(255 * v);
     col.col[ri + 1] = 0;
-    col.col[ri + 2] = (int)floor(255 * v);
+    col.col[ri + 2] = 0;
     col.col[ri + 3] = 255;
 }
 
@@ -71,11 +71,30 @@ ratio: x:x**2:x**3 creates a coffee like gradient
 
 */
 void setcol__mocha(fr_col_t col, int ri, int i, float v) {
-    col.col[ri + 0] = (int)floor(255 * v);
+    col.col[ri + 0] = (int)floor(255 * v * v * v);
     col.col[ri + 1] = (int)floor(255 * v * v);
-    col.col[ri + 2] = (int)floor(255 * v * v * v);
+    col.col[ri + 2] = (int)floor(255 * v);
     col.col[ri + 3] = 255;
 }
+
+
+void setcol__simple (fr_col_t col, int ri, int i, float v) {
+    col.col[ri + 0] = 255 * (i % 3 == 2);
+    col.col[ri + 1] = 255 * (i % 3 == 1);
+    col.col[ri + 2] = 255 * (i % 3 == 0);
+    col.col[ri + 3] = 255;
+}
+
+// FLAG colors
+void setcol__usa(fr_col_t col, int ri, int i, float v) {
+    col.col[ri + 0] = 255 * ((i % 3 == 2) || (i % 3 == 1));
+    col.col[ri + 1] = 255 * (i % 3 == 1);
+    col.col[ri + 2] = 255 * ((i % 3 == 0) || (i % 3 == 1));
+    col.col[ri + 3] = 255;
+}
+
+
+
 // random color scheme. Each R,G,B value is a random value, but alpha is 255
 void setcol__random(fr_col_t col, int ri, int i, float v) {
     col.col[ri + 0] = rand() & 0xff;
@@ -102,6 +121,10 @@ void setcol(fr_col_t col, char * scheme) {
         cfnc = &setcol__blue;
     } else if (SEQ(scheme, "mocha")) {
         cfnc = &setcol__mocha;
+    } else if (SEQ(scheme, "simple")) {
+        cfnc = &setcol__simple;
+    } else if (SEQ(scheme, "usa")) {
+        cfnc = &setcol__usa;
     } else if (SEQ(scheme, "random")) {
         cfnc = &setcol__random;
     } else {

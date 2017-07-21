@@ -47,11 +47,13 @@ int sdl_hndl_res;
 }
 
 // this 'smashes' x down to 0 if abs(x)<(e), or just evaluates to x
+// useful for joystick inputs so no slight drift keeps forcing recomputation
 #define SMASH(x, e) ((int)floor(((x) <= (e) && (x) >= -(e)) ? (0) : (x)))
 
 // the font size for SDL rendering. Eventually (possibly) this should be
 // relative to window size
-#define FONT_SIZE           30
+#define MIN(a, b) ((a) > (b) ? (a) : (b) )
+#define FONT_SIZE           (MIN(14, fr.h/24))
 
 
 // the last full-cycle FPS (what the user sees)
@@ -68,6 +70,9 @@ unsigned char * pixels;
 
 // a global hash, so we know whether to update the fractal
 unsigned int hash;
+
+// whether or not to draw the information
+bool show_text_info = true;
 
 // the previous x and y coordinates
 double last_x, last_y;
@@ -106,11 +111,12 @@ SDL_Renderer * renderer;
 
 
 // this is the color of the info text at the top left of the screen
-SDL_Color text_color = { 255, 255, 255 };
+SDL_Color text_color = { 0, 0, 0 },
+          text_box_color = {255, 255, 255 };
 
 // the message lengths for strings
-#define MAX_ONSCREEN_MESSAGE   (100 + 10 * 4)
-#define NUM_ONSCREEN_MESSAGE   (4)
+#define MAX_ONSCREEN_MESSAGE   (100 + 30 * 5)
+#define NUM_ONSCREEN_MESSAGE   (10)
 
 // pointer to onscreen message strings
 char ** onscreen_message = NULL;
@@ -128,7 +134,6 @@ void gather_picture() {
     // naddr never points to its own memory, just as an offset to the global
     // pixels array. Thus, free() should never be called with naddr
     unsigned char * naddr,
-    // cmp_bytes
                   * cmp_bytes = (unsigned char *)malloc(LZ4_compressBound(fr.mem_w * pe));
     int nbytes, cmp_nbytes;
 
@@ -159,6 +164,7 @@ void gather_picture() {
             memcpy(naddr, cmp_bytes, abs(cmp_nbytes));
         }
         )
+        log_trace("recv from (%d) fps: %.2lf, Mb/s: %.2lf", i, 1.0 / tp_recv.elapsed_s, abs(cmp_nbytes) / (1e6 *  tp_recv.elapsed_s));
         //log_trace("%%%lf of final size (worker %d)", 100.0 * cmp_nbytes / nbytes, i);
         s_recv += tp_recv.elapsed_s;
         s_decompress += tp_decompress.elapsed_s;
@@ -166,10 +172,7 @@ void gather_picture() {
         total_compressed_bytes += abs(cmp_nbytes);
     }
     compress_rate = total_compressed_bytes / total_bytes;
-    log_debug("recv tfps: %.2lf, decompress tfps: %.2lf, compression ratio: %.2lf", 1.0 / s_recv, 1.0 / s_decompress, compress_rate);
-    //memcpy(surface->pixels, pixels, fr.mem_w * fr.h);
-//log_trace("MPI_Bcast(fr) fps: %lf", 1.0 / tp_bc.elapsed_s);
-    // print out debug info
+    log_debug("recv tfps: %.2lf, Mb/s: %.2lf, decompress tfps: %.2lf, compression ratio: %.2lf", 1.0 / s_recv, total_compressed_bytes / (1e6 * s_recv), 1.0 / s_decompress, compress_rate);
 }
 
 // refreshes the whole window, recalculating if needed
@@ -178,12 +181,16 @@ void window_refresh() {
         return;
     }
     tperf_t tp_wr, tp_gp, tp_draw, tp_textdraw;
-
+    SDL_Rect text_box_offset = (SDL_Rect){0, 0, 0, 0};
     offset = (SDL_Rect){0, 0, 0, 0};
+    offset.w = fr.w / 6;
+    offset.h = fr.h / 6;
 
-    screen = SDL_GetWindowSurface(window);
     
     C_TIME(tp_wr,
+    // get the window surface again, just in case something changed
+    screen = SDL_GetWindowSurface(window);
+    
     if (pixels == NULL) {
         log_trace("malloc'ing render pixels");
         if (pixels != NULL) {
@@ -194,50 +201,84 @@ void window_refresh() {
     }
 
 
-    // GET PIXEL DATA HERE
+    // time how long it takes to: ask for an image, let compute nodes
+    // run, transfer back compressed/uncompressed data, and then
+    // combine it into the global pixels array
     C_TIME(tp_gp,
     gather_picture();
-    //mand_c(fr.w, fr.h, fr.cX, fr.cY, fr.Z, fr.max_iter, pixels);
     )
+    
 
-    C_TIME(tp_draw,
-    SDL_UpdateTexture(texture, NULL, pixels, fr.mem_w);
-    SDL_RenderClear(renderer);
-    SDL_RenderCopy(renderer, texture, NULL, NULL);
-    SDL_RenderPresent(renderer);
-//    SDL_HNDL(SDL_BlitSurface(surface, NULL, screen, NULL));
-    )
-
+    if (show_text_info) {
     // first time through, allocated enough messages
     if (onscreen_message == NULL) {
         onscreen_message = malloc(NUM_ONSCREEN_MESSAGE * sizeof(char *));
         int i;
         for (i = 0; i < NUM_ONSCREEN_MESSAGE; ++i) {
             onscreen_message[i] = malloc(MAX_ONSCREEN_MESSAGE);
+            sprintf(onscreen_message[i], "%s", "");
         }
     }
-    // onscreen messages
-    sprintf(onscreen_message[0], "fps: %2.1lf", last_fps);
-    sprintf(onscreen_message[1], "compression rate: %1.2lf", compress_rate);
     
-    C_TIME(tp_textdraw,/*
+
+    sprintf(onscreen_message[0], "%s", fractal_types_names[fractal_types_idx]);
+    sprintf(onscreen_message[1], "center:%.10lf%+.10lf", fr.cX, fr.cY);
+    sprintf(onscreen_message[2], "zoom: %.2e", fr.Z);
+    sprintf(onscreen_message[3], "iter: %d", fr.max_iter);
+   
+
+    // onscreen messages
+    if (last_fps > 0.0) {
+        sprintf(onscreen_message[4], "fps: %2.1lf", last_fps);
+    }
+    if (compress_rate > 0.0) {
+        //sprintf(onscreen_message[2], "compression rate: %1.2lf", compress_rate);
+    }
+    
+    C_TIME(tp_draw, 
+    // start rendering, we need to clear the render instance
+    SDL_RenderClear(renderer);
+    SDL_UpdateTexture(texture, NULL, pixels, fr.mem_w);
+    SDL_RenderCopy(renderer, texture, NULL, NULL);
+    )
+
+
+    C_TIME(tp_textdraw,
     int i;
-    for (i = 0; i < 2; ++i) {
-        tsurface = TTF_RenderText_Solid(font, onscreen_message[i], text_color);
-        SDL_HNDL(SDL_BlitSurface(tsurface, NULL, screen, &offset));
-        offset.y += FONT_SIZE;
-    }*/
+    int max_w = 0;
+    for (i = 0; i < NUM_ONSCREEN_MESSAGE; ++i) {
+        if (strlen(onscreen_message[i]) > 0) {
+            tsurface = TTF_RenderText_Solid(font, onscreen_message[i], text_color);
+            if (tsurface->w > max_w) max_w = tsurface->w;
+            text_box_offset.h += tsurface->h;
+        }
+    }
+    text_box_offset.w = max_w + FONT_SIZE / 2;
+    text_box_offset.h += FONT_SIZE / 2;
+    SDL_RenderFillRect(renderer, &text_box_offset);
+    for (i = 0; i < NUM_ONSCREEN_MESSAGE; ++i) {
+        if (strlen(onscreen_message[i]) > 0) {
+            tsurface = TTF_RenderText_Solid(font, onscreen_message[i], text_color);
+            offset.w = tsurface->w;
+            offset.h = tsurface->h;
+            SDL_Texture *message_texture = SDL_CreateTextureFromSurface(renderer, tsurface);
+            SDL_RenderCopy(renderer, message_texture, NULL, &offset);
+            offset.y += FONT_SIZE;
+        }
+    }
     )
-    //tsurface = TTF_RenderText_Solid(font, onscreen_message[1], text_color);
-    //SDL_HNDL(SDL_BlitSurface(tsurface, NULL, screen, &offset));
-     
-
-     //SDL_HNDL(SDL_BlitSurface(surface, NULL, screen, &offset));
-
-    // do a screen refresh
-    //SDL_HNDL(SDL_UpdateWindowSurface(window));
+    }
+    
+    double __elapsed_draw_s = tp_draw.elapsed_s;
+    C_TIME(tp_draw,
+    SDL_RenderPresent(renderer);
     )
-    // print out debug info
+
+    tp_draw.elapsed_s += __elapsed_draw_s;
+    )
+
+    
+    // logging basic info
     log_info("fps: %.2lf, gather_picture() fps: %.2lf, draw fps: %.2lf text draw fps: %.2lf", 1.0 / tp_wr.elapsed_s, 1.0 / tp_gp.elapsed_s, 1.0 / tp_draw.elapsed_s, 1.0 / tp_textdraw.elapsed_s);
     last_fps = 1.0 / tp_wr.elapsed_s;
 
@@ -264,6 +305,14 @@ void fractalexplorer_render(int * argc, char ** argv) {
 
     // make sure to quit and shut down TTF libraries
     atexit(TTF_Quit);
+
+    window = SDL_CreateWindow("Mandelbrot Render", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, fr.w, fr.h, 0);
+    if (fr.w == 0 || fr.h == 0 || use_fullscreen) {
+        SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP); // SDL_WINDOW_FULLSCREEN_DESKTOP, or SDL_WINDOW_FULLSCREEN
+    }
+    // in case fullscreen changes it
+    SDL_GetWindowSize(window, &fr.w, &fr.h);
+
 
     // try to open our default font
     font = TTF_OpenFont("UbuntuMono-R.ttf", FONT_SIZE);
@@ -299,12 +348,6 @@ void fractalexplorer_render(int * argc, char ** argv) {
     }
 
     
-    window = SDL_CreateWindow("Mandelbrot Render", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, fr.w, fr.h, 0);
-    if (fr.w == 0 || fr.h == 0 || use_fullscreen) {
-        SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP); // SDL_WINDOW_FULLSCREEN_DESKTOP, or SDL_WINDOW_FULLSCREEN
-    }
-    // in case fullscreen changes it
-    SDL_GetWindowSize(window, &fr.w, &fr.h);
 
 //    screen = SDL_GetWindowSurface(window);
 
@@ -312,7 +355,10 @@ void fractalexplorer_render(int * argc, char ** argv) {
     renderer = SDL_CreateRenderer(window, -1, 0);
 
 
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 120);
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+
+
     SDL_RenderClear(renderer);
     SDL_RenderPresent(renderer);
     
@@ -348,9 +394,9 @@ void fractalexplorer_render(int * argc, char ** argv) {
             update = horiz_v != 0 || vert_v != 0 || zoom_v != 0;
             if (update) {
                 double scale_allinput = (double)(SDL_GetTicks() - last_ticks) / 1000.0;
-                fr.cX += scale_allinput * horiz_v / (AXIS_MAX * fr.Z);
-                fr.cY -= scale_allinput * vert_v / (AXIS_MAX * fr.Z);
-                double zfact = 1.0 + scale_allinput * abs(zoom_v) / AXIS_MAX;
+                fr.cX += 1.4 * scale_allinput * horiz_v / (AXIS_MAX * fr.Z);
+                fr.cY -= 1.4 * scale_allinput * vert_v / (AXIS_MAX * fr.Z);
+                double zfact = 1.0 + 1.4 * scale_allinput * abs(zoom_v) / AXIS_MAX;
                 if (zoom_v > 0) {
                     fr.Z /= zfact;
                 } else if (zoom_v < 0) {

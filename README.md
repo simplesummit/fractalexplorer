@@ -60,6 +60,28 @@ You will need at least 2 threads (1 head and 1 compute), but you can add as many
 TODO: Add multi-machine example
 
 
+### Controls
+
+#### Keyboard
+
+Keyboard arrows pan, space zooms in, and shift+space zooms out.
+
+`p` increases iteration, `o` decreases
+
+`k` increases number of nodes working on image, `j` decreases
+
+`m` and `n` navigate through the fractal types
+
+
+
+#### Mouse
+
+You need to change macros in `src/render.c`, that start with `CONTROLLER_`.
+
+These control which joystick axis controls various movement
+
+We have ordered controllers that haven't came in yet, so we haven't invested too much in controller input
+
 ## Bundling
 
 To distribute source, run `make dist-gzip` (or `make dist-zip`), you should have `fractalexplorer-VERSION.tar.gz` (or `fractalexplorer-VERSION.zip`).

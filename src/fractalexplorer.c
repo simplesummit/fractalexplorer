@@ -43,6 +43,13 @@ int fractal_types[FR_FRACTAL_NUM] = {
 
 };
 
+char * fractal_types_names[FR_FRACTAL_NUM] = {
+    "Mandelbrot: z^2+c",
+    "Multibrot: z^3+c",
+    "exp(z) + c",
+    "sin(z) + c"
+};
+
 int * gargc;
 
 char *** gargv;
@@ -51,12 +58,13 @@ char *** gargv;
 bool use_fullscreen = false;
 
 MPI_Datatype mpi_fr_t;
-int mpi_fr_blocklengths[mpi_fr_numitems] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
-MPI_Datatype mpi_fr_types[mpi_fr_numitems] = { MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT };
+int mpi_fr_blocklengths[mpi_fr_numitems] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
+MPI_Datatype mpi_fr_types[mpi_fr_numitems] = { MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT };
 MPI_Aint mpi_fr_offsets[mpi_fr_numitems];
 
 
 fr_col_t col;
+
 
 
 #define M_EXIT(n) MPI_Finalize(); exit(0);
@@ -175,9 +183,11 @@ int main(int argc, char ** argv) {
 
     int res = -100, loglvl;
 
-    fr.cX = .2821;
-    fr.cY = .01;
-    fr.Z = 1;
+    fr.cX = -0.5;
+    fr.cY = 0.0;
+    fr.Z = 0.4;
+    fr.u = 0.0;
+    fr.v = 0.0;
     fr.coffset = 0;
     fr.cscale = 1.0;
     fr.max_iter = 100;
@@ -188,9 +198,9 @@ int main(int argc, char ** argv) {
     fr.fractal_type = FR_MANDELBROT;
 
     // see fr.h for more  flags
-    fr.fractal_flags = FRF_NONE;// | FRF_ADD_PERIOD;//| FRF_BINARYDECOMP_REAL | FRF_BINARYDECOMP_IMAG;// | FRF_SIMPLE;
+    fr.fractal_flags = FRF_NONE | FRF_SIMPLE;// | FRF_BINARYDECOMP_REAL | FRF_BINARYDECOMP_IMAG;// | FRF_SIMPLE;
 
-    col.num = 20;
+    col.num = 120;
 
     if (IS_HEAD) {
         res = parse_args(argc, argv);
@@ -223,15 +233,17 @@ int main(int argc, char ** argv) {
     mpi_fr_offsets[0] = offsetof(fr_t, cX);
     mpi_fr_offsets[1] = offsetof(fr_t, cY);
     mpi_fr_offsets[2] = offsetof(fr_t, Z);
-    mpi_fr_offsets[3] = offsetof(fr_t, coffset);
-    mpi_fr_offsets[4] = offsetof(fr_t, cscale);
-    mpi_fr_offsets[5] = offsetof(fr_t, max_iter);
-    mpi_fr_offsets[6] = offsetof(fr_t, w);
-    mpi_fr_offsets[7] = offsetof(fr_t, h);
-    mpi_fr_offsets[8] = offsetof(fr_t, mem_w);
-    mpi_fr_offsets[9] = offsetof(fr_t, fractal_type);
-    mpi_fr_offsets[10] = offsetof(fr_t, fractal_flags);
-    mpi_fr_offsets[11] = offsetof(fr_t, num_workers);
+    mpi_fr_offsets[3] = offsetof(fr_t, u);
+    mpi_fr_offsets[4] = offsetof(fr_t, v);
+    mpi_fr_offsets[5] = offsetof(fr_t, coffset);
+    mpi_fr_offsets[6] = offsetof(fr_t, cscale);
+    mpi_fr_offsets[7] = offsetof(fr_t, max_iter);
+    mpi_fr_offsets[8] = offsetof(fr_t, w);
+    mpi_fr_offsets[9] = offsetof(fr_t, h);
+    mpi_fr_offsets[10] = offsetof(fr_t, mem_w);
+    mpi_fr_offsets[11] = offsetof(fr_t, fractal_type);
+    mpi_fr_offsets[12] = offsetof(fr_t, fractal_flags);
+    mpi_fr_offsets[13] = offsetof(fr_t, num_workers);
 
     MPI_Type_create_struct(mpi_fr_numitems, mpi_fr_blocklengths, mpi_fr_offsets, mpi_fr_types, &mpi_fr_t);
     MPI_Type_commit(&mpi_fr_t);
@@ -380,7 +392,7 @@ void start_compute() {
         
         C_TIME(tp_send,
           MPI_Send(&cmp_size, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
-	  MPI_Send(pixels_cmp, cmp_size, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
+	  MPI_Send(pixels_cmp, abs(cmp_size), MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
         }
         )
         log_debug("compute fps: %.2lf, compress fps: %.2lf, send fps: %.2lf", 1.0 / tp_compute.elapsed_s, 1.0 / tp_compress.elapsed_s, 1.0 / tp_send.elapsed_s);

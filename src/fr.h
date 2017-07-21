@@ -82,6 +82,11 @@ typedef struct fr_t {
     // creating a dppx variable (which should have a value of 2.0 / (Z * w))
     double cX, cY, Z;
 
+    // these variables are special variables that can be used for anything the
+    // fractal desires. So, for julia sets, these may be the real and imag
+    // components
+    double u, v;
+
     // color offset and scale. The fri (fractional index) is tranformed by this
     // rule: offset + fri * scale -> fri
     double coffset, cscale;

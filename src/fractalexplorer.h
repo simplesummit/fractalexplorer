@@ -45,6 +45,7 @@ bool use_fullscreen;
 
 int fractal_types_idx;
 int fractal_types[FR_FRACTAL_NUM];
+char * fractal_types_names[FR_FRACTAL_NUM];
 
 // time performance
 typedef struct tperf_t {
@@ -83,7 +84,7 @@ typedef struct mandelbrot_argp_t {
 } mandelbrot_argp_t;
 
 
-#define mpi_fr_numitems (12)
+#define mpi_fr_numitems (14)
 
 /*MPI_Datatype mpi_fr_t;
 int mpi_fr_blocklengths[mpi_fr_numitems];

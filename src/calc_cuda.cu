@@ -36,10 +36,20 @@ our complex number library, in cuda
 
 */
 
+
+// behave just like the C functions
 #define creal(a) a.x
 #define cimag(a) a.y
 #define cabs(a) sqrt(a.x*a.x+a.y*a.y)
+#define carg(a) atan2(a.y, a.x)
+
+
+// the squared abs, i.e. cabs(a) * cabs(a)
 #define cabs2(a) (a.x*a.x+a.y*a.y)
+
+
+
+// constructor
 #define ccreate(x, y) ((cuDoubleComplex){ (x), (y) })
 
 
@@ -210,11 +220,7 @@ void cuda_kernel(fr_t fr, int my_h, int my_off, unsigned char * col, int ncol, u
                     }
                 }
                 tmp = log(log(cabs2(z)));
-        //        if (fr.fractal_flags & FRF_BINARYDECOMP) {
-            //        fri = min_mag_ci;//2.0 +  - tmp / log(2.0);// + ((cimag(z) >= 0) ? 1.0 : 0.0);
-          //      } else {
-                    fri = 2.0 + ci - tmp / log(2.0);
-              //  }
+                fri = 2.0 + ci - tmp / log(2.0);
             }
             break;
         case FR_MANDELBROT_3:
@@ -273,6 +279,19 @@ void cuda_kernel(fr_t fr, int my_h, int my_off, unsigned char * col, int ncol, u
     // set the fri to corresponding values
     if (ci == fr.max_iter) {
         fri = 0.0 + fr.max_iter;
+    }
+
+    if (fr.fractal_flags & FRF_ADD_PERIOD) {
+        tmp = fri - floor(fri);
+        fri += ((1-tmp)*carg(z)+tmp*(carg(cuCadd(cuCmul(z, z), c))));
+    }
+
+    if (fr.fractal_flags & FRF_BINARYDECOMP_REAL && creal(z) >= 0) {
+        fri += 1.0;
+    }
+    
+    if (fr.fractal_flags & FRF_BINARYDECOMP_IMAG && cimag(z) >= 0) {
+        fri += 2.0;
     }
 
     fri = fri * fr.cscale + fr.coffset;
