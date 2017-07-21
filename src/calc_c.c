@@ -28,11 +28,22 @@ can also find a copy at http://www.gnu.org/licenses/.
 // functions
 //#include "tgmath.h"
 
+// additional macros for complex numbers
+// returns the square of the absolute value (cabs(a)*cabs(a))
+#define cabs2(a) (creal(a)*creal(a)+cimag(a)*cimag(a))
+
 
 // a macro to scale between values. when F = 0, MIX macro takes the
 // value of a, when F = 1.0, the macro takes the value of b, and all
 // values inbetween are linearly scaled
-#define MIX(a, b, F) ((b) * (F) + (a) * (1 - (F)))
+
+// these two are called with () around arguments from MIX
+#define __LIN_MIX(a, b, F) (b * F + a * (1 - F))
+#define __CUBIC_MIX_FLIP(F) (1-(1-F)*(1-F)*(1-F))
+#define __CUBIC_MIX(a, b, F) __LIN_MIX(a, b, __CUBIC_MIX_FLIP(F))
+#define __CBRT_MIX(a, b, F) __LIN_MIX(a, b, (cbrt(F)))
+
+#define MIX(a, b, F) __LIN_MIX((a), (b), (F))
 
 // keeps track of whether the engine has initialized
 bool c_has_init = false;
@@ -170,12 +181,8 @@ void calc_c(fr_t fr, int my_h, int my_off, unsigned char * output) {
                         // https://linas.org/art-gallery/escape/escape.html
                         // We have modified it a bit to produce even more
                         // pleasing images
-                        tmp = log(log(creal(z)*creal(z) + cimag(z)*cimag(z)));
-                        if (fr.fractal_flags & FRF_TANKTREADS) {
-                            fri = 2.0 + ci - tmp / log(2.5);
-                        } else {
-                            fri = 2.0 + ci - tmp / log(2.0);
-                        }
+                        tmp = log(log(cabs2(z)));
+                        fri = 2.0 + ci - tmp / log(2.0);
                     } else {
                         // skip out early, and set that this point will be part
                         // of the mandelbrot set
@@ -237,6 +244,17 @@ void calc_c(fr_t fr, int my_h, int my_off, unsigned char * output) {
                 fri = 0.0 + fr.max_iter;
             }
 
+            if (fr.fractal_flags & FRF_ADD_PERIOD) {
+                fri += (carg(z) + (floor(fri)-fri)*(2*carg(z)+carg(c)));
+            }
+
+            // binary decomposition
+            if (fr.fractal_flags & FRF_BINARYDECOMP_REAL && creal(z) >= 0) {
+                fri += 1.0;
+            } 
+            if (fr.fractal_flags & FRF_BINARYDECOMP_IMAG && cimag(z) >= 0) {
+                fri += 2.0;
+            }
             // TODO: implement scale and offset for function
             fri = fri * fr.cscale + fr.coffset;
 

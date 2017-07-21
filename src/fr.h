@@ -54,8 +54,14 @@ can also find a copy at http://www.gnu.org/licenses/.
 #define FRF_SIMPLE                (0x0001)
 
 
-// do tank tread iteration divisor, which creates an interesting image
-#define FRF_TANKTREADS            (0x0002)
+// conditionally change the image based on if the last real/imag compoenent
+// of `z` is positive or negative
+#define FRF_BINARYDECOMP_REAL     (0x0002)
+#define FRF_BINARYDECOMP_IMAG     (0x0004)
+
+// adds the period (angle) of complex number
+#define FRF_ADD_PERIOD            (0x0008)
+
 
 
 // the main fractal type. This type handles parameters (center, zoom, iter count

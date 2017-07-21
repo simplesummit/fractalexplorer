@@ -29,9 +29,6 @@ extern "C" {
 #include "fr.h"
 #include "log.h"
 
-#define creal(a) a.x
-#define cimag(a) a.y
-
 
 /*
 
@@ -39,8 +36,9 @@ our complex number library, in cuda
 
 */
 
-
-#define cabs(a) hypot(a.x*a.x, a.y*a.y)
+#define creal(a) a.x
+#define cimag(a) a.y
+#define cabs(a) sqrt(a.x*a.x+a.y*a.y)
 #define cabs2(a) (a.x*a.x+a.y*a.y)
 #define ccreate(x, y) ((cuDoubleComplex){ (x), (y) })
 
@@ -176,6 +174,10 @@ void cuda_kernel(fr_t fr, int my_h, int my_off, unsigned char * col, int ncol, u
 
     // fractional index
     double fri, mfact, _q, tmp;
+    
+    // minimum magnitude, and the iteration it occured at (only used by some functions)
+    double min_mag;
+    int min_mag_ci;
 
     // real, imaginary
     cuDoubleComplex z, c;
@@ -197,16 +199,22 @@ void cuda_kernel(fr_t fr, int my_h, int my_off, unsigned char * col, int ncol, u
                 ci = fr.max_iter;
                 fri = ci + 0.0;
             } else {
+                min_mag = cabs(z);
+                min_mag_ci = 0;
                 for (ci = 0; ci < fr.max_iter && cabs(z) < 16.0; ++ci) {
                     z = cuCsqr(z);
                     z = cuCadd(z, c);
+                    if (cabs(z) < min_mag) {
+                        min_mag = cabs(z);
+                        min_mag_ci = ci;
+                    }
                 }
                 tmp = log(log(cabs2(z)));
-                if (fr.fractal_flags & FRF_TANKTREADS) {
-                    fri = 2.0 + ci - tmp / log(2.5);
-                } else {
+        //        if (fr.fractal_flags & FRF_BINARYDECOMP) {
+            //        fri = min_mag_ci;//2.0 +  - tmp / log(2.0);// + ((cimag(z) >= 0) ? 1.0 : 0.0);
+          //      } else {
                     fri = 2.0 + ci - tmp / log(2.0);
-                }
+              //  }
             }
             break;
         case FR_MANDELBROT_3:
@@ -346,5 +354,13 @@ void calc_cuda(fr_t fr, fr_col_t col, int my_h, int my_off, unsigned char * outp
 
 }
 
-
 }
+
+#undef cabs
+#undef cabs2
+#undef creal
+#undef cimag
+
+
+
+
