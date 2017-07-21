@@ -198,7 +198,7 @@ int main(int argc, char ** argv) {
     fr.fractal_type = FR_MANDELBROT;
 
     // see fr.h for more  flags
-    fr.fractal_flags = FRF_NONE | FRF_SIMPLE;// | FRF_BINARYDECOMP_REAL | FRF_BINARYDECOMP_IMAG;// | FRF_SIMPLE;
+    fr.fractal_flags = FRF_NONE | FRF_BINARYDECOMP_IMAG;// | FRF_BINARYDECOMP_REAL;// | FRF_SIMPLE;
 
     col.num = 120;
 
@@ -373,7 +373,7 @@ void start_compute() {
             }
             // scan line
             //log_trace("scanline");
-            //scanline(pixels, fr.w, 0);
+            scanline(pixels, fr.w, 0);
         )
 
 
