@@ -188,7 +188,7 @@ int main(int argc, char ** argv) {
     fr.fractal_type = FR_MANDELBROT;
 
     // see fr.h for more  flags
-    fr.fractal_flags = FRF_NONE | FRF_ADD_PERIOD;//| FRF_BINARYDECOMP_REAL | FRF_BINARYDECOMP_IMAG;// | FRF_SIMPLE;
+    fr.fractal_flags = FRF_NONE;// | FRF_ADD_PERIOD;//| FRF_BINARYDECOMP_REAL | FRF_BINARYDECOMP_IMAG;// | FRF_SIMPLE;
 
     col.num = 20;
 

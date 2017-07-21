@@ -245,7 +245,8 @@ void calc_c(fr_t fr, int my_h, int my_off, unsigned char * output) {
             }
 
             if (fr.fractal_flags & FRF_ADD_PERIOD) {
-                fri += (carg(z) + (floor(fri)-fri)*(2*carg(z)+carg(c)));
+                tmp = floor(fri)-fri;
+                fri += ((1-tmp)*carg(z) + (tmp)*(carg(z*z+c)));
             }
 
             // binary decomposition
