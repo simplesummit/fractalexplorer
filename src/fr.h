@@ -104,7 +104,7 @@ typedef struct fr_t {
     // memory parameters, w is the actual image width, in pixels, h is the
     // actual image height, and mem_w is the memory width of a row (is >=
     // 4 * w), and is used because of restrictions of SDL
-    int w, h, mem_w;
+    int w, h;
 
     // a fractal enum, see FR_* macros in this file (fr.h), this is typically
     // handled in a case switch block. See FRF_* macros for flags

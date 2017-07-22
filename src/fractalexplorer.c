@@ -58,8 +58,8 @@ char *** gargv;
 bool use_fullscreen = false;
 
 MPI_Datatype mpi_fr_t;
-int mpi_fr_blocklengths[mpi_fr_numitems] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
-MPI_Datatype mpi_fr_types[mpi_fr_numitems] = { MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT };
+int mpi_fr_blocklengths[mpi_fr_numitems] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
+MPI_Datatype mpi_fr_types[mpi_fr_numitems] = { MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT };
 MPI_Aint mpi_fr_offsets[mpi_fr_numitems];
 
 
@@ -240,10 +240,9 @@ int main(int argc, char ** argv) {
     mpi_fr_offsets[7] = offsetof(fr_t, max_iter);
     mpi_fr_offsets[8] = offsetof(fr_t, w);
     mpi_fr_offsets[9] = offsetof(fr_t, h);
-    mpi_fr_offsets[10] = offsetof(fr_t, mem_w);
-    mpi_fr_offsets[11] = offsetof(fr_t, fractal_type);
-    mpi_fr_offsets[12] = offsetof(fr_t, fractal_flags);
-    mpi_fr_offsets[13] = offsetof(fr_t, num_workers);
+    mpi_fr_offsets[10] = offsetof(fr_t, fractal_type);
+    mpi_fr_offsets[11] = offsetof(fr_t, fractal_flags);
+    mpi_fr_offsets[12] = offsetof(fr_t, num_workers);
 
     MPI_Type_create_struct(mpi_fr_numitems, mpi_fr_blocklengths, mpi_fr_offsets, mpi_fr_types, &mpi_fr_t);
     MPI_Type_commit(&mpi_fr_t);
@@ -306,13 +305,11 @@ void start_compute() {
 #endif
 
 
-    unsigned char * pixels = NULL, * pixels_cmp = NULL;
+    int max_compress_size = LZ4_compressBound(4 * fr.w * fr.h);
+    int compress_size;
 
-    int my_h, my_off;
-
-
-    int cmp_size = 0, max_cmp_size = 0;
-    int lmcs = 0;
+    unsigned char * compute_buffer = malloc(4 * fr.w * fr.h), 
+                  * compress_buffer = malloc(max_compress_size);
 
     tperf_t tp_compute, tp_compress, tp_send;
     /*
@@ -346,57 +343,53 @@ void start_compute() {
         }
         */
         if (compute_rank < fr.num_workers) {
-        my_h = fr.h / fr.num_workers;
-        my_off = compute_rank * fr.h / fr.num_workers;
-        max_cmp_size = LZ4_compressBound(fr.mem_w * my_h);
-        //MPI_Bcast(&fr.Z, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        if (pixels == NULL || !has_ran || fr_last.w != fr.w || fr_last.h != fr.h || lmcs != max_cmp_size) {
-            if (pixels != NULL) {
-                free(pixels);
-            }
-            if (pixels_cmp != NULL) {
-                free(pixels_cmp);
-            }
-            pixels = (unsigned char *)malloc(fr.mem_w * my_h);
-            pixels_cmp = (unsigned char *)malloc(max_cmp_size);
-        }
-        memset(pixels, 0, fr.mem_w * my_h);
-        C_TIME(tp_compute,
-            if (engine == E_C) {
-                log_trace("mand_c starting");
-                calc_c(fr, my_h, my_off, pixels);
-            } else if (engine == E_CUDA) {
-                log_trace("mand_cuda starting");
-                CUDA_EXEC
-            } else {
-                log_error("Unknown engine");
-            }
-            // scan line
-            //log_trace("scanline");
-            scanline(pixels, fr.w, 0);
-        )
 
+            // should probably memset this to clear it
+            memset(compute_buffer, 0, 4 * fr.w * fr.h);
+            memset(compress_buffer, 0, max_compress_size);
 
-        C_TIME(tp_compress,
-        //log_trace("sending pixels back, hash: %d", nhsh(pixels, fr.mem_w * my_h));
-        if (do_compress) {
-            cmp_size = LZ4_compress_default((char *)pixels, (char *)pixels_cmp, my_h * fr.mem_w, max_cmp_size);
-            if (cmp_size <= 0) {
-               log_error("error in compression function: %d", cmp_size);
-            }
-        } else {
-            cmp_size = -my_h * fr.mem_w;
-            memcpy(pixels_cmp, pixels, abs(cmp_size));
+            C_TIME(tp_compute,
+                if (engine == E_C) {
+                    log_trace("mand_c starting");
+                    calc_c(fr, compute_rank, fr.num_workers, compute_buffer);
+                } else if (engine == E_CUDA) {
+                    log_trace("mand_cuda starting");
+                    //CUDA_EXEC
+                } else {
+                    log_error("Unknown engine");
+                }
+
+                // scan line
+                //log_trace("scanline");
+                //scanline(pixels, fr.w, 0);
+            )
+
+            C_TIME(tp_compress,
+                if (do_compress) {
+                    compress_size = LZ4_compress_default((char *)compute_buffer, (char *)compress_buffer, 4 * fr.h * fr.w / fr.num_workers, max_compress_size);
+                    if (compress_size <= 0) {
+                        log_error("error in compression function: %d", compress_size);
+                    }
+                } else {
+                    compress_size = -4 * fr.h * fr.w / fr.num_workers;
+                    memcpy(compress_buffer, compute_buffer, abs(compress_size));
+                }
+            )
         }
-        )
+
+        MPI_Barrier(MPI_COMM_WORLD);
+
+        if (compute_rank < fr.num_workers) {
+            C_TIME(tp_send,
+                MPI_Ssend(&compress_size, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
+                MPI_Ssend(compress_buffer, abs(compress_size), MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
+            )
+        }
         
-        C_TIME(tp_send,
-          MPI_Send(&cmp_size, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
-	  MPI_Send(pixels_cmp, abs(cmp_size), MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
-        }
-        )
-        log_debug("compute fps: %.2lf, compress fps: %.2lf, send fps: %.2lf", 1.0 / tp_compute.elapsed_s, 1.0 / tp_compress.elapsed_s, 1.0 / tp_send.elapsed_s);
-        lmcs = max_cmp_size;
+        log_debug("compute fps: %.2lf, compress fps: %.2lf", 1.0 / tp_compute.elapsed_s, 1.0 / tp_compress.elapsed_s);
+
+        MPI_Barrier(MPI_COMM_WORLD);
+
         fr_last = fr;
         has_ran = true;
     }

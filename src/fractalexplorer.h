@@ -84,7 +84,7 @@ typedef struct mandelbrot_argp_t {
 } mandelbrot_argp_t;
 
 
-#define mpi_fr_numitems (14)
+#define mpi_fr_numitems (13)
 
 /*MPI_Datatype mpi_fr_t;
 int mpi_fr_blocklengths[mpi_fr_numitems];

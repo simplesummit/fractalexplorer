@@ -164,23 +164,21 @@ bool cuda_has_init = false;
 // colors, and an output buffer. err will be set to non-zero if an error occured
 // Note that the buffers should be allocated with CUDA device memory functions
 __global__
-void cuda_kernel(fr_t fr, int my_h, int my_off, unsigned char * col, int ncol, unsigned char * output, int * err) {
+void cuda_kernel(fr_t fr, int tid, int threads, unsigned char * col, int ncol, unsigned char * output, int * err) {
 
     // compute the current pixel offset
     int px = (blockIdx.x * blockDim.x) + threadIdx.x;
-    int py = (blockIdx.y * blockDim.y) + threadIdx.y;
+    int py = tid + threads * ((blockIdx.y * blockDim.y) + threadIdx.y);
 
     // it may be desirable to launch a job with more than neccessary dimensions
     // so, we simply don't run when this is true
-    if (px >= fr.w || py >= my_h || my_off + py >= fr.h) {
+    if (px >= fr.w || py >= fr.h) {
         return;
     }
 
     // the return index, current iteration, and color indexes
-    int ri = py * fr.mem_w + 4 * px, ci, c0, c1;
+    int ri = 4 * (px + fr.w * (py / threads)), ci, c0, c1;
 
-    // the offset is added (as the px and py are 0 based)
-    py += my_off;
 
     // fractional index
     double fri, mfact, _q, tmp;
@@ -316,12 +314,15 @@ void cuda_kernel(fr_t fr, int my_h, int my_off, unsigned char * col, int ncol, u
 
 }
 
-void calc_cuda_init(fr_col_t col) {
+void calc_cuda_init(fr_t fr, fr_col_t col) {
     if (!cuda_has_init) {
-        colnum = col.num;
-        gpuErrchk(cudaMalloc((void **)&_gpu_err, sizeof(int)));
         int gpu_err_start = 0;
+        gpuErrchk(cudaMalloc((void **)&_gpu_err, sizeof(int)));
         gpuErrchk(cudaMemcpy(_gpu_err, &gpu_err_start, sizeof(int), cudaMemcpyHostToDevice));
+
+        gpuErrchk(cudaMalloc((void **)&_gpu_output, 4 * fr.w * fr.h));
+        
+        colnum = col.num;
         gpuErrchk(cudaMalloc((void **)&_gpu_col, 4 * colnum));
         gpuErrchk(cudaMemcpy(_gpu_col, col.col, 4 * colnum, cudaMemcpyHostToDevice));
         cuda_has_init = true;
@@ -335,25 +336,18 @@ int grid_from_block(int a, int b) {
     return a / b + (a % b != 0);
 }
 
-void calc_cuda(fr_t fr, fr_col_t col, int my_h, int my_off, unsigned char * output) {
-    calc_cuda_init(col);
+void calc_cuda(fr_t fr, fr_col_t col, int tid, int threads, unsigned char * output) {
+    calc_cuda_init(fr, col);
 
     dim3 dimBlock(16, 16);
     dim3 dimGrid(grid_from_block(fr.w,  dimBlock.x), 
-                 grid_from_block(my_h, dimBlock.y));
+                 grid_from_block(fr.h / threads, dimBlock.y));
 
-
-    if (lw != fr.mem_w || lh != my_h) {
-        if (_gpu_output != NULL) {
-            cudaFree(_gpu_output);
-        }
-        gpuErrchk(cudaMalloc((void **)&_gpu_output, fr.mem_w * my_h));
-    }
 
     log_debug("cuda kernel launched at center: %f%+f, zoom: %lf, iter: %d with grid: (%d,%d), block (%d,%d)", fr.cX, fr.cY, fr.Z, fr.max_iter, dimGrid.x, dimGrid.y, dimBlock.x, dimBlock.y);
 
     // we dont need cudaMalloc(), because of ZEROcopy buffers that the GPU and CPU can share sys memory
-    cuda_kernel<<<dimGrid, dimBlock>>>(fr, my_h, my_off, _gpu_col, colnum, _gpu_output, _gpu_err);
+    cuda_kernel<<<dimGrid, dimBlock>>>(fr, tid, threads, _gpu_col, colnum, _gpu_output, _gpu_err);
 
 
     gpuErrchk(cudaDeviceSynchronize());
@@ -361,15 +355,12 @@ void calc_cuda(fr_t fr, fr_col_t col, int my_h, int my_off, unsigned char * outp
 
     int res_err = 0;
 
-    gpuErrchk(cudaMemcpy(output, _gpu_output, fr.mem_w * my_h, cudaMemcpyDeviceToHost));
+    gpuErrchk(cudaMemcpy(output, _gpu_output, 4 * fr.w * (fr.h / threads), cudaMemcpyDeviceToHost));
     gpuErrchk(cudaMemcpy(&res_err, _gpu_err, sizeof(int), cudaMemcpyDeviceToHost));
 
     if (res_err != 0) {
         log_error("result from cuda kernel is non-zero: %d\n", res_err);
     }
-
-    lw = fr.mem_w;
-    lh = my_h;
 
 }
 

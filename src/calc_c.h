@@ -23,6 +23,6 @@ can also find a copy at http://www.gnu.org/licenses/.
 void calc_c_init();
 
 // calculate image and store it in output
-void calc_c(fr_t fr, int my_h, int my_off, unsigned char * output);
+void calc_c(fr_t fr, int tid, int threads, unsigned char * output);
 
 #endif

@@ -138,7 +138,8 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
         fprintf(L.fp, "\n");
     }
 
-
+    fflush(stdout);
+    fflush(stderr);
     /* Release lock */
     unlock();
 

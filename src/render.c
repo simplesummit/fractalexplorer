@@ -109,6 +109,11 @@ SDL_Surface * tsurface;
 SDL_Rect offset;
 SDL_Renderer * renderer;
 
+int * recv_nbytes = NULL;
+unsigned char ** recv_bytes = NULL, ** recv_compressed_bytes = NULL;
+MPI_Request * recv_requests = NULL;
+MPI_Status * recv_status = NULL;
+
 
 // this is the color of the info text at the top left of the screen
 SDL_Color text_color = { 0, 0, 0 },
@@ -130,49 +135,72 @@ unsigned int hash_fr(fr_t fr) {
 // requests picture from compute nodes
 void gather_picture() {
     // pe is how much should be computed by each worker
-    int i, pe = fr.h / fr.num_workers;
+    int i, j;
     // naddr never points to its own memory, just as an offset to the global
     // pixels array. Thus, free() should never be called with naddr
-    unsigned char * naddr,
-                  * cmp_bytes = (unsigned char *)malloc(LZ4_compressBound(fr.mem_w * pe));
-    int nbytes, cmp_nbytes;
+    unsigned char * naddr;
+    if (recv_nbytes == NULL) {
+        log_trace("initializing buffers for storing compressed/computed pixels");
+        recv_nbytes = malloc(sizeof(int *) * compute_size);
+        recv_compressed_bytes = malloc(sizeof(unsigned char *) * compute_size);
+        recv_bytes = malloc(sizeof(unsigned char *) * compute_size);
+        recv_requests = malloc(sizeof(MPI_Request) * compute_size);
+        recv_status = malloc(sizeof(MPI_Status) * compute_size);
+        for (i = 0; i < compute_size; ++i) {
+            // this should be the maximum ever needed
+            recv_bytes[i] = malloc(4 * fr.w * fr.h);
+            recv_compressed_bytes[i] = malloc(LZ4_compressBound(4 * fr.w * fr.h));
+        }
+    }
 
-    // we use this for printing out statistics
-    double total_bytes = 0, total_compressed_bytes = 0;
+    int bytes_per_compute = 4 * fr.w * fr.h / fr.num_workers;
 
     MPI_Bcast(&fr, 1, mpi_fr_t, 0, MPI_COMM_WORLD);
 
     tperf_t tp_recv, tp_decompress;
-    double s_recv = 0, s_decompress = 0;
- 
-    memset(pixels, 0, fr.mem_w * fr.h);
-    // loop through all workers
-    for (i = 1; i <= fr.num_workers; ++i) {
-        // get the offset into the final
-        naddr = pixels + pe * fr.mem_w * (i - 1);
-        nbytes = fr.mem_w * pe;
-        C_TIME(tp_recv,
-        // if a negative value is sent back, no compression is used
-        MPI_Recv(&cmp_nbytes, 1, MPI_INT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        //log_trace("recv from %d (compressed), size: %d", i, cmp_nbytes);
-        MPI_Recv(cmp_bytes, abs(cmp_nbytes), MPI_UNSIGNED_CHAR, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        )
-        C_TIME(tp_decompress,
-        if (cmp_nbytes > 0) {
-            LZ4_decompress_safe((char *)cmp_bytes, (char*)naddr, abs(cmp_nbytes), nbytes);
-        } else {
-            memcpy(naddr, cmp_bytes, abs(cmp_nbytes));
+
+    double total_compressed_bytes = 0;
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    memset(pixels, 0, 4 * fr.w * fr.h);
+
+    C_TIME(tp_recv,
+        // loop through all workers
+        for (i = 0; i < fr.num_workers; ++i) {
+            MPI_Recv(&recv_nbytes[i], 1, MPI_INT, i + 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            MPI_Irecv(recv_compressed_bytes[i], abs(recv_nbytes[i]), MPI_UNSIGNED_CHAR, i + 1, 0, MPI_COMM_WORLD, &recv_requests[i]);
         }
-        )
-        log_trace("recv from (%d) fps: %.2lf, Mb/s: %.2lf", i, 1.0 / tp_recv.elapsed_s, abs(cmp_nbytes) / (1e6 *  tp_recv.elapsed_s));
-        //log_trace("%%%lf of final size (worker %d)", 100.0 * cmp_nbytes / nbytes, i);
-        s_recv += tp_recv.elapsed_s;
-        s_decompress += tp_decompress.elapsed_s;
-        total_bytes += nbytes;
-        total_compressed_bytes += abs(cmp_nbytes);
-    }
-    compress_rate = total_compressed_bytes / total_bytes;
-    log_debug("recv tfps: %.2lf, Mb/s: %.2lf, decompress tfps: %.2lf, compression ratio: %.2lf", 1.0 / s_recv, total_compressed_bytes / (1e6 * s_recv), 1.0 / s_decompress, compress_rate);
+
+        for (i = 0; i < fr.num_workers; ++i) {
+            MPI_Wait(&recv_requests[i], &recv_status[i]);
+        }
+    )
+    C_TIME(tp_decompress,
+        for (i = 0; i < fr.num_workers; ++i) {
+            if (recv_nbytes[i] > 0) {
+                int decompress_err = LZ4_decompress_safe((char *)recv_compressed_bytes[i], (char*)recv_bytes[i], abs(recv_nbytes[i]), bytes_per_compute);
+                if (decompress_err < 0) {
+                    log_error("decompression error: %d", decompress_err);
+                    exit(3);
+                }
+            } else {
+                memcpy(recv_bytes[i], recv_compressed_bytes[i], bytes_per_compute);
+            }
+
+            for (j = i; j < fr.h; j += fr.num_workers) {
+                memcpy(pixels + 4 * (j * fr.w), recv_bytes[i] + 4 * (fr.w * ((j-i) / fr.num_workers)), 4 * fr.w);
+            }
+            total_compressed_bytes += abs(recv_nbytes[i]);
+        }
+    )
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    
+    compress_rate = total_compressed_bytes / (4 * fr.w * fr.h);
+    log_info("Mb/s: %.2lf", total_compressed_bytes / (1e6 * tp_recv.elapsed_s));
+    log_debug("recv tfps: %.2lf, decompress tfps: %.2lf, compression ratio: %.2lf", 1.0 / tp_recv.elapsed_s, 1.0 / tp_decompress.elapsed_s, compress_rate);
 }
 
 // refreshes the whole window, recalculating if needed
@@ -196,8 +224,8 @@ void window_refresh() {
         if (pixels != NULL) {
             //free(pixels);
         }
-        pixels = (unsigned char *)malloc(fr.mem_w * fr.h);
-        memset(pixels, 0, fr.mem_w * fr.h);
+        pixels = (unsigned char *)malloc(4 * fr.w * fr.h);
+        memset(pixels, 0, 4 * fr.w * fr.h);
     }
 
 
@@ -219,13 +247,11 @@ void window_refresh() {
             sprintf(onscreen_message[i], "%s", "");
         }
     }
-    
 
     sprintf(onscreen_message[0], "%s", fractal_types_names[fractal_types_idx]);
     sprintf(onscreen_message[1], "center:%.10lf%+.10lf", fr.cX, fr.cY);
     sprintf(onscreen_message[2], "zoom: %.2e", fr.Z);
     sprintf(onscreen_message[3], "iter: %d", fr.max_iter);
-   
 
     // onscreen messages
     if (last_fps > 0.0) {
@@ -238,7 +264,7 @@ void window_refresh() {
     C_TIME(tp_draw, 
     // start rendering, we need to clear the render instance
     SDL_RenderClear(renderer);
-    SDL_UpdateTexture(texture, NULL, pixels, fr.mem_w);
+    SDL_UpdateTexture(texture, NULL, pixels, 4 * fr.w);
     SDL_RenderCopy(renderer, texture, NULL, NULL);
     )
 
@@ -279,7 +305,9 @@ void window_refresh() {
 
     
     // logging basic info
-    log_info("fps: %.2lf, gather_picture() fps: %.2lf, draw fps: %.2lf text draw fps: %.2lf", 1.0 / tp_wr.elapsed_s, 1.0 / tp_gp.elapsed_s, 1.0 / tp_draw.elapsed_s, 1.0 / tp_textdraw.elapsed_s);
+    log_info("fps: %.2lf, gather_picture() fps: %.2lf", 1.0 / tp_wr.elapsed_s, 1.0 / tp_gp.elapsed_s);
+    log_debug("draw fps: %.2lf, text draw fps: %.2lf", 1.0 / tp_draw.elapsed_s, 1.0 / tp_textdraw.elapsed_s);
+
     last_fps = 1.0 / tp_wr.elapsed_s;
 
 }
@@ -370,7 +398,6 @@ void fractalexplorer_render(int * argc, char ** argv) {
         log_error("SDL failed to create surface: %s", SDL_GetError());
     }
     */
-    fr.mem_w = 4 * fr.w;
 
     window_refresh();
 

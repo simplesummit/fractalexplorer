@@ -84,7 +84,7 @@ inline bool bulb_check_0(double complex p) {
 // at (0, my_off) and lasting till (fr.w - 1, my_off + my_h), with a pixel depth
 // of 4 bytes/px. Although, the index of point (px, py) is determined by
 // fr.mem_w (see fr.h for more on this)
-void calc_c(fr_t fr, int my_h, int my_off, unsigned char * output) {
+void calc_c(fr_t fr, int tid, int threads, unsigned char * output) {
     // ensure the engine is initialized
     calc_c_init();
 
@@ -109,22 +109,24 @@ void calc_c(fr_t fr, int my_h, int my_off, unsigned char * output) {
     dppx = 2.0 / (fr.w * fr.Z);
 
     // start compute loop
-    log_trace("mand_c running center (%lf,%lf), zoom %lf, dim (%d,%d)",
+    log_trace("mand_c running center (%lf,%lf), zoom %lf, dim (%d,%d), threads: %d, stripe: %d",
               fr.cX, fr.cY,
               fr.Z,
-              fr.w, my_h);
+              fr.w, fr.h,
+              threads,
+              tid);
 
     // fr.w is the bounding box, and the only reason we use fr.mem_w is for
     // buffer sizes
     for (px = 0; px < fr.w; ++px) {
         // we need to make sure we don't overshoot fr.h, and we only do (at max)
         // my_h rows
-        for (py = 0; py < my_h && my_off + py < fr.h; ++py) {
+        for (py = tid; py < fr.h; py += threads) {
 
             // return index is fr.mem_w (which includes the factor of 4) and
             // the factor of 4 times the horizontal offset. Then, 0 bytes away
             // is R, 1 is B, 2 is G, 3 is A
-            ri = 4 * px + py * fr.mem_w;
+            ri = 4 * (px + fr.w * ((py-tid) / threads));
 
             // scale so that pixels are even, and the center is truly in the
             // center of the image
@@ -134,7 +136,7 @@ void calc_c(fr_t fr, int my_h, int my_off, unsigned char * output) {
             // once set in this loop, `c` should not be changed, as it
             // is expected to represent the coordinate value at (px, py)
             c = 1 * (fr.cX - 1.0 / fr.Z + px * dppx) +
-                I * (fr.cY + fr.h / (fr.w * fr.Z) - (py + my_off) * dppx);
+                I * (fr.cY + fr.h / (fr.w * fr.Z) - py * dppx);
 
             // start `z` at `c` (most fractals will use this)
             z = c;
@@ -289,4 +291,5 @@ void calc_c(fr_t fr, int my_h, int my_off, unsigned char * output) {
             output[ri + 3] = (int)floor(MIX(col.col[c0 + 3], col.col[c1 + 3], mfact));
         }
     }
+    log_trace("exiting calc_c");
 }
