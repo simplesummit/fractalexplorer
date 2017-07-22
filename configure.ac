@@ -32,6 +32,8 @@ if test -z "$CC"; then
     CC=mpicc
 fi
 
+CFLAGS="$CFLAGS -Ofast -ffast-math"
+
 AC_LANG(C)
 AC_PROG_CC
 PKG_PROG_PKG_CONFIG

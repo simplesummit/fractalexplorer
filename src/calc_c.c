@@ -101,6 +101,8 @@ void calc_c(fr_t fr, int tid, int threads, unsigned char * output) {
     // the delta per pixel (this is mentioned in fr.h)
     double tmp, fri, mfact, dppx;
 
+    double _t0, _t1, _t2, _t3, _t4, _t5, _t6;
+
     // complex numbers representing the current iteration, and the starting
     // value for a pixel
     double complex z, c;
@@ -159,6 +161,13 @@ void calc_c(fr_t fr, int tid, int threads, unsigned char * output) {
                     // we should skip the computation
                     if (!bulb_check_0(c)) {
 
+                        _t0 = creal(c);
+                        _t1 = cimag(c);
+                        _t2 = creal(z);
+                        _t3 = cimag(z);
+                        _t4 = _t2 * _t2;
+                        _t5 = _t3 * _t3;
+
                         // loop through following condition `1` listed before
                         // the switch statement.
                         // the default error value (16.0) to determine escape
@@ -167,11 +176,18 @@ void calc_c(fr_t fr, int tid, int threads, unsigned char * output) {
                         // however, this leads to some visual artifacts and
                         // should be kept >= 4.0, with 16.0 further reducing
                         // visual imperfections
-                        for (ci = 0; ci < fr.max_iter && cabs(z) <= 16.0; ++ci) {
-
+                        for (ci = 0; ci < fr.max_iter && _t4 + _t5 <= 16.0; ++ci) {
                             // this is the standard function, z = z ** 2 + c
-                            z = z * z + c;
+                            //z = z * z + c;
 
+                            // here is an optimized version
+                            _t6 = 2 * _t2 * _t3;
+                            _t2 = _t4 - _t5 + _t0;
+
+                            _t3 = _t6 + _t1;
+
+                            _t4 = _t2 * _t2;
+                            _t5 = _t3 * _t3;
                         }
 
                         // this is part of the fractional iteration count, and
@@ -183,8 +199,7 @@ void calc_c(fr_t fr, int tid, int threads, unsigned char * output) {
                         // https://linas.org/art-gallery/escape/escape.html
                         // We have modified it a bit to produce even more
                         // pleasing images
-                        tmp = log(log(cabs2(z)));
-                        fri = 2.0 + ci - tmp / log(2.0);
+                        fri = 2.0 + ci - log(log(_t4 + _t5)) / log(2.0);
                     } else {
                         // skip out early, and set that this point will be part
                         // of the mandelbrot set
@@ -285,10 +300,10 @@ void calc_c(fr_t fr, int tid, int threads, unsigned char * output) {
             // values inbetween are linearly scaled
 
             // set each to the mix between colorscheme values
-            output[ri + 0] = (int)floor(MIX(col.col[c0 + 0], col.col[c1 + 0], mfact));
-            output[ri + 1] = (int)floor(MIX(col.col[c0 + 1], col.col[c1 + 1], mfact));
-            output[ri + 2] = (int)floor(MIX(col.col[c0 + 2], col.col[c1 + 2], mfact));
-            output[ri + 3] = (int)floor(MIX(col.col[c0 + 3], col.col[c1 + 3], mfact));
+            output[ri + 0] = MIX(col.col[c0 + 0], col.col[c1 + 0], mfact);
+            output[ri + 1] = MIX(col.col[c0 + 1], col.col[c1 + 1], mfact);
+            output[ri + 2] = MIX(col.col[c0 + 2], col.col[c1 + 2], mfact);
+            output[ri + 3] = MIX(col.col[c0 + 3], col.col[c1 + 3], mfact);
         }
     }
     log_trace("exiting calc_c");
