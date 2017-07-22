@@ -108,6 +108,8 @@ TTF_Font *font;
 SDL_Surface * tsurface;
 SDL_Rect offset;
 SDL_Renderer * renderer;
+SDL_Texture *message_texture;
+
 
 int * recv_nbytes = NULL;
 unsigned char ** recv_bytes = NULL, ** recv_compressed_bytes = NULL;
@@ -154,16 +156,21 @@ void gather_picture() {
     }
 
     int bytes_per_compute = 4 * fr.w * fr.h / fr.num_workers;
-
-    MPI_Bcast(&fr, 1, mpi_fr_t, 0, MPI_COMM_WORLD);
-
-    tperf_t tp_recv, tp_decompress;
-
+    
     double total_compressed_bytes = 0;
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    tperf_t tp_compute;
+    tperf_t tp_recv, tp_decompress;
+    
+    C_TIME(tp_compute,
+        MPI_Bcast(&fr, 1, mpi_fr_t, 0, MPI_COMM_WORLD);
 
-    memset(pixels, 0, 4 * fr.w * fr.h);
+
+        MPI_Barrier(MPI_COMM_WORLD);
+    )
+
+    // if getting lingering artifacts, make sure to clear the buffer
+    //memset(pixels, 0, 4 * fr.w * fr.h);
 
     C_TIME(tp_recv,
         // loop through all workers
@@ -200,7 +207,7 @@ void gather_picture() {
     
     compress_rate = total_compressed_bytes / (4 * fr.w * fr.h);
     log_info("Mb/s: %.2lf", total_compressed_bytes / (1e6 * tp_recv.elapsed_s));
-    log_debug("recv tfps: %.2lf, decompress tfps: %.2lf, compression ratio: %.2lf", 1.0 / tp_recv.elapsed_s, 1.0 / tp_decompress.elapsed_s, compress_rate);
+    log_debug("compute tfps: %.2lf, recv tfps: %.2lf, decompress tfps: %.2lf, compression ratio: %.2lf", 1.0 / tp_compute.elapsed_s, 1.0 / tp_recv.elapsed_s, 1.0 / tp_decompress.elapsed_s, compress_rate);
 }
 
 // refreshes the whole window, recalculating if needed
@@ -214,8 +221,8 @@ void window_refresh() {
     offset.w = fr.w / 6;
     offset.h = fr.h / 6;
 
+    int i;
     
-    C_TIME(tp_wr,
     // get the window surface again, just in case something changed
     screen = SDL_GetWindowSurface(window);
     
@@ -233,82 +240,87 @@ void window_refresh() {
     // run, transfer back compressed/uncompressed data, and then
     // combine it into the global pixels array
     C_TIME(tp_gp,
-    gather_picture();
+        gather_picture();
+    )
+
+    C_TIME(tp_draw, 
+        // start rendering, we need to clear the render instance
+        SDL_RenderClear(renderer);
+        SDL_UpdateTexture(texture, NULL, pixels, 4 * fr.w);
+        SDL_RenderCopy(renderer, texture, NULL, NULL);
     )
     
 
     if (show_text_info) {
-    // first time through, allocated enough messages
-    if (onscreen_message == NULL) {
-        onscreen_message = malloc(NUM_ONSCREEN_MESSAGE * sizeof(char *));
-        int i;
+        log_trace("showing text info");
+        
+        // first time through, allocated enough messages
+        if (onscreen_message == NULL) {
+            onscreen_message = malloc(NUM_ONSCREEN_MESSAGE * sizeof(char *));
+            for (i = 0; i < NUM_ONSCREEN_MESSAGE; ++i) {
+                onscreen_message[i] = malloc(MAX_ONSCREEN_MESSAGE);
+                sprintf(onscreen_message[i], "%s", "");
+            }
+        }
         for (i = 0; i < NUM_ONSCREEN_MESSAGE; ++i) {
             onscreen_message[i] = malloc(MAX_ONSCREEN_MESSAGE);
             sprintf(onscreen_message[i], "%s", "");
         }
+
+        sprintf(onscreen_message[0], "%s", fractal_types_names[fractal_types_idx]);
+        sprintf(onscreen_message[1], "%s", "-");
+        sprintf(onscreen_message[2], "center:%.10lf%+.10lf", fr.cX, fr.cY);
+        sprintf(onscreen_message[3], "zoom: %.2e", fr.Z);
+        sprintf(onscreen_message[4], "iter: %d", fr.max_iter);
+        sprintf(onscreen_message[5], "workers: %d", fr.num_workers);
+        //sprintf(onscreen_message[6], "compute fps: %2.1lf", 1.0 / (tp_gp.elapsed_s));
+        //sprintf(onscreen_message[7], "draw fps: %2.1lf", 1.0 / (tp_draw.elapsed_s + tp_textdraw.elapsed_s));
+        C_TIME(tp_textdraw,
+            int max_w = 0;
+            for (i = 0; i < NUM_ONSCREEN_MESSAGE; ++i) {
+                if (strlen(onscreen_message[i]) > 0) {
+                    if (strlen(onscreen_message[i]) > 1) {
+                        tsurface = TTF_RenderText_Solid(font, onscreen_message[i], text_color);
+                        if (tsurface->w > max_w) max_w = tsurface->w;
+                        text_box_offset.h += tsurface->h;
+                    } else {
+                        text_box_offset.h += FONT_SIZE;
+                    }
+
+                }
+            }
+            text_box_offset.w = max_w + FONT_SIZE / 2;
+            text_box_offset.h += FONT_SIZE / 2;
+            SDL_RenderFillRect(renderer, &text_box_offset);
+            for (i = 0; i < NUM_ONSCREEN_MESSAGE; ++i) {
+                if (strlen(onscreen_message[i]) > 0) {
+                    tsurface = TTF_RenderText_Solid(font, onscreen_message[i], text_color);
+                    offset.w = tsurface->w;
+                    offset.h = tsurface->h;
+                    message_texture = SDL_CreateTextureFromSurface(renderer, tsurface);
+                    SDL_RenderCopy(renderer, message_texture, NULL, &offset);
+                    offset.y += FONT_SIZE;
+                }
+            }
+        )
+        
+        sprintf(onscreen_message[1], "fps: %.2lf", 1.0 / (tp_wr.elapsed_s + tp_gp.elapsed_s + tp_draw.elapsed_s));
+        tsurface = TTF_RenderText_Solid(font, onscreen_message[1], text_color);
+        log_trace("created surface");
+        message_texture = SDL_CreateTextureFromSurface(renderer, tsurface);
+        offset.y = FONT_SIZE;
+        SDL_RenderCopy(renderer, message_texture, NULL, &offset);
     }
 
-    sprintf(onscreen_message[0], "%s", fractal_types_names[fractal_types_idx]);
-    sprintf(onscreen_message[1], "center:%.10lf%+.10lf", fr.cX, fr.cY);
-    sprintf(onscreen_message[2], "zoom: %.2e", fr.Z);
-    sprintf(onscreen_message[3], "iter: %d", fr.max_iter);
 
-    // onscreen messages
-    if (last_fps > 0.0) {
-        sprintf(onscreen_message[4], "fps: %2.1lf", last_fps);
-    }
-    if (compress_rate > 0.0) {
-        //sprintf(onscreen_message[2], "compression rate: %1.2lf", compress_rate);
-    }
-    
-    C_TIME(tp_draw, 
-    // start rendering, we need to clear the render instance
-    SDL_RenderClear(renderer);
-    SDL_UpdateTexture(texture, NULL, pixels, 4 * fr.w);
-    SDL_RenderCopy(renderer, texture, NULL, NULL);
-    )
-
-
-    C_TIME(tp_textdraw,
-    int i;
-    int max_w = 0;
-    for (i = 0; i < NUM_ONSCREEN_MESSAGE; ++i) {
-        if (strlen(onscreen_message[i]) > 0) {
-            tsurface = TTF_RenderText_Solid(font, onscreen_message[i], text_color);
-            if (tsurface->w > max_w) max_w = tsurface->w;
-            text_box_offset.h += tsurface->h;
-        }
-    }
-    text_box_offset.w = max_w + FONT_SIZE / 2;
-    text_box_offset.h += FONT_SIZE / 2;
-    SDL_RenderFillRect(renderer, &text_box_offset);
-    for (i = 0; i < NUM_ONSCREEN_MESSAGE; ++i) {
-        if (strlen(onscreen_message[i]) > 0) {
-            tsurface = TTF_RenderText_Solid(font, onscreen_message[i], text_color);
-            offset.w = tsurface->w;
-            offset.h = tsurface->h;
-            SDL_Texture *message_texture = SDL_CreateTextureFromSurface(renderer, tsurface);
-            SDL_RenderCopy(renderer, message_texture, NULL, &offset);
-            offset.y += FONT_SIZE;
-        }
-    }
-    )
-    }
-    
-    double __elapsed_draw_s = tp_draw.elapsed_s;
-    C_TIME(tp_draw,
     SDL_RenderPresent(renderer);
-    )
-
-    tp_draw.elapsed_s += __elapsed_draw_s;
-    )
-
     
+
     // logging basic info
-    log_info("fps: %.2lf, gather_picture() fps: %.2lf", 1.0 / tp_wr.elapsed_s, 1.0 / tp_gp.elapsed_s);
+    log_info("fps: %.2lf, gather_picture() fps: %.2lf", 1.0 / (tp_wr.elapsed_s + tp_gp.elapsed_s + tp_draw.elapsed_s + tp_textdraw.elapsed_s), 1.0 / tp_gp.elapsed_s);
     log_debug("draw fps: %.2lf, text draw fps: %.2lf", 1.0 / tp_draw.elapsed_s, 1.0 / tp_textdraw.elapsed_s);
 
-    last_fps = 1.0 / tp_wr.elapsed_s;
+    last_fps = 1.0 / (tp_wr.elapsed_s + tp_gp.elapsed_s + tp_draw.elapsed_s + tp_textdraw.elapsed_s);
 
 }
 
@@ -398,6 +410,9 @@ void fractalexplorer_render(int * argc, char ** argv) {
         log_error("SDL failed to create surface: %s", SDL_GetError());
     }
     */
+
+    MPI_Bcast(&fr, 1, mpi_fr_t, 0, MPI_COMM_WORLD);
+
 
     window_refresh();
 

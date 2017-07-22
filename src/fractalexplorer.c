@@ -219,7 +219,7 @@ int main(int argc, char ** argv) {
     }
 
     if (compute_size <= 0) {
-        printf("ERROR: please run with more than 1 thread (need at least 1 compute node!)\n");
+        printf("ERROR: please run with more than 1 thread (need at least 1 compute node!) (world size: %d, compute size: %d)\n", world_size, compute_size);
         M_EXIT(1);
     }
 
@@ -292,9 +292,7 @@ void end_render() {
 void start_compute() {
     log_debug("starting compute");
 
-    fr_t fr_last;
-
-    fr_last = fr;
+    MPI_Bcast(&fr, 1, mpi_fr_t, 0, MPI_COMM_WORLD);
 
     bool has_ran = false;
 
@@ -327,12 +325,15 @@ void start_compute() {
 // macro to fail if we don't have cuda
 
 #ifdef HAVE_CUDA
-#define CUDA_EXEC log_trace("mand_cuda starting"); calc_cuda(fr, col, my_h, my_off, pixels);
+#define CUDA_EXEC log_trace("mand_cuda starting"); calc_cuda(fr, col, compute_rank, fr.num_workers, pixels);
 #else
 #define CUDA_EXEC log_fatal("wasn't compiled with CUDA support"); M_EXIT(1);
 #endif
 
     bool do_compress = true;
+
+    memset(compute_buffer, 0, 4 * fr.w * fr.h);
+    memset(compress_buffer, 0, max_compress_size);
 
     while (true) {
         MPI_Bcast(&fr, 1, mpi_fr_t, 0, MPI_COMM_WORLD);
@@ -345,8 +346,9 @@ void start_compute() {
         if (compute_rank < fr.num_workers) {
 
             // should probably memset this to clear it
-            memset(compute_buffer, 0, 4 * fr.w * fr.h);
-            memset(compress_buffer, 0, max_compress_size);
+            // memset(compute_buffer, 0, 4 * fr.w * fr.h);
+            // memset(compress_buffer, 0, max_compress_size);
+
 
             C_TIME(tp_compute,
                 if (engine == E_C) {
@@ -354,7 +356,7 @@ void start_compute() {
                     calc_c(fr, compute_rank, fr.num_workers, compute_buffer);
                 } else if (engine == E_CUDA) {
                     log_trace("mand_cuda starting");
-                    //CUDA_EXEC
+                    CUDA_EXEC
                 } else {
                     log_error("Unknown engine");
                 }
@@ -390,8 +392,6 @@ void start_compute() {
 
         MPI_Barrier(MPI_COMM_WORLD);
 
-        fr_last = fr;
-        has_ran = true;
     }
 }
 // when computing ends
