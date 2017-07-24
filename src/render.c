@@ -465,6 +465,12 @@ void window_refresh() {
 
 }
 
+#define FONT_ROOT "/usr/local/share/fonts/"
+#define FONT_ROOT_2 "/usr/share/fonts/truetype/"
+
+#define OFONTS(x) font = TTF_OpenFont(x, FONT_SIZE);
+#define OFONT(x) OFONTS(x); if (font == NULL) { OFONTS(FONT_ROOT x) } if (font == NULL) { OFONTS(FONT_ROOT_2 x) }
+
 
 // our main method
 void fractalexplorer_render(int * argc, char ** argv) {
@@ -496,20 +502,6 @@ void fractalexplorer_render(int * argc, char ** argv) {
 
 
     // try to open our default font
-    font = TTF_OpenFont("UbuntuMono-R.ttf", FONT_SIZE);
-    if (font == NULL) {
-        log_debug("TTF_OpenFont(UbuntuMono-R.ttf) Failed: %s", TTF_GetError());
-        font = TTF_OpenFont("Ubuntu-R.ttf", FONT_SIZE);
-        if (font == NULL) {
-            log_debug("TTF_OpenFont(Ubuntu-R.ttf) Failed: %s", TTF_GetError());
-            font = TTF_OpenFont("UbuntuMono.ttf", FONT_SIZE);
-            if (font == NULL) {
-                log_debug("TTF_OpenFont(UbuntuMono.ttf) Failed: %s", TTF_GetError());
-                log_fatal("Could not find a suitable font!");
-                exit(1);
-            }
-        }
-    }
 
     log_debug("%i joysticks were found, using joystick[0]\n\n", SDL_NumJoysticks());
     //log_debug("The names of the joysticks are:\n");
@@ -529,6 +521,14 @@ void fractalexplorer_render(int * argc, char ** argv) {
     }
 
     
+    OFONT("UbuntuMono.ttf");
+    if (font == NULL) {
+        OFONT("ubuntu-font-family/Ubuntu-R.ttf");
+    }
+    if (font == NULL) {
+        log_error("couldn't find UbuntuMono font");
+        exit(3);
+    }
 
 //    screen = SDL_GetWindowSurface(window);
 
