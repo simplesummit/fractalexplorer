@@ -36,9 +36,9 @@ endif
 
 
 # TODO: test if nvcc itself supports -Ofast
-NVCC_CFLAGS = -Xcompiler -Ofast -gencode arch=compute_52,code=sm_52 -gencode arch=compute_53,code=sm_53 -gencode arch=compute_60,code=sm_60 -gencode arch=compute_62,code=sm_62 -gencode arch=compute_62,code=compute_62
+NVCC_CFLAGS = -Xcompiler -Ofast -gencode arch=compute_62,code=compute_62 #-gencode arch=compute_52,code=sm_52 -gencode arch=compute_53,code=sm_53 -gencode arch=compute_60,code=sm_60 -gencode arch=compute_62,code=sm_62 -gencode arch=compute_62,code=compute_62
 CUDA_CFLAGS = @CUDA_CFLAGS@
 CUDA_LDFLAGS = @CUDA_LDFLAGS@
 
 calc_cuda.o: calc_cuda.cu fr.h
-	$(NVCC) $(CUDA_CFLAGS) $(NVCC_CFLAGS) -Xcompiler -fPIC -I. -I.. -DHAVE_CONFIG_H -m64 $(CUDA_LDFLAGS) -lib -o $@ -c $<
+	$(NVCC) $(CUDA_CFLAGS) $(NVCC_CFLAGS) -Xptxas -allow-expensive-optimizations=true -use_fast_math -Xcompiler -Ofast -Xcompiler -ffast-math -Xcompiler -fPIC -I. -I.. -DHAVE_CONFIG_H -m64 $(CUDA_LDFLAGS) -lib -o $@ -c $<

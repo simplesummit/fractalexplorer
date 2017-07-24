@@ -31,6 +31,13 @@ can also find a copy at http://www.gnu.org/licenses/.
 // z**3 + c
 #define FR_MANDELBROT_3      (0x0102)
 
+
+// engine enums
+
+// engine C
+#define FR_E_C               (0x0001)
+#define FR_E_CUDA            (0x0002)
+
 /* extra functions, not fully fleshed out */
 
 // testing exp function, exp(z) + c. This needs work testing for escape bounds!
@@ -106,9 +113,10 @@ typedef struct fr_t {
     // 4 * w), and is used because of restrictions of SDL
     int w, h;
 
+    // an engine enum, represents which engine to use
     // a fractal enum, see FR_* macros in this file (fr.h), this is typically
     // handled in a case switch block. See FRF_* macros for flags
-    int fractal_type, fractal_flags;
+    int engine, fractal_type, fractal_flags;
 
     // how many workers are working on the current image, and take note that
     // while initially equal to the macro `compute_size`, the render node can

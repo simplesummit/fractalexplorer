@@ -58,8 +58,8 @@ char *** gargv;
 bool use_fullscreen = false;
 
 MPI_Datatype mpi_fr_t;
-int mpi_fr_blocklengths[mpi_fr_numitems] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
-MPI_Datatype mpi_fr_types[mpi_fr_numitems] = { MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT };
+int mpi_fr_blocklengths[mpi_fr_numitems] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
+MPI_Datatype mpi_fr_types[mpi_fr_numitems] = { MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT };
 MPI_Aint mpi_fr_offsets[mpi_fr_numitems];
 
 
@@ -70,11 +70,6 @@ fr_col_t col;
 #define M_EXIT(n) MPI_Finalize(); exit(0);
 
 #define GETOPT_STOP ((char)-1)
-
-#define E_C  (0x101)
-#define E_CUDA (0x102)
-
-int engine = E_C;
 
 char * csch = "green";
 
@@ -148,9 +143,9 @@ int parse_args(int argc, char ** argv) {
             break;
         case 'e':
             if (SEQ(optarg, "c")) {
-                engine = E_C;
+                fr.engine = FR_E_C;
             } else if (SEQ(optarg, "cuda")) {
-                engine = E_CUDA;
+                fr.engine = FR_E_CUDA;
             } else {
                 printf("Error: Unkown engine '%s'\n", optarg);
                 return 1;
@@ -193,12 +188,13 @@ int main(int argc, char ** argv) {
     fr.max_iter = 100;
     fr.w = 640;
     fr.h = 480;
+    fr.engine = FR_E_C;
 
     // see fr.h for more types
     fr.fractal_type = FR_MANDELBROT;
 
     // see fr.h for more  flags
-    fr.fractal_flags = FRF_NONE;// | FRF_BINARYDECOMP_IMAG;// | FRF_BINARYDECOMP_REAL;// | FRF_ADD_PERIOD;// | FRF_SIMPLE;
+    fr.fractal_flags = FRF_NONE | FRF_SIMPLE | FRF_BINARYDECOMP_IMAG;// | FRF_BINARYDECOMP_IMAG;// | FRF_BINARYDECOMP_REAL;// | FRF_ADD_PERIOD;// | FRF_SIMPLE;
 
     col.num = 120;
 
@@ -208,7 +204,6 @@ int main(int argc, char ** argv) {
         fr.num_workers = compute_size;
     }
 
-    MPI_Bcast(&engine, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&res, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&loglvl, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
@@ -240,9 +235,10 @@ int main(int argc, char ** argv) {
     mpi_fr_offsets[7] = offsetof(fr_t, max_iter);
     mpi_fr_offsets[8] = offsetof(fr_t, w);
     mpi_fr_offsets[9] = offsetof(fr_t, h);
-    mpi_fr_offsets[10] = offsetof(fr_t, fractal_type);
-    mpi_fr_offsets[11] = offsetof(fr_t, fractal_flags);
-    mpi_fr_offsets[12] = offsetof(fr_t, num_workers);
+    mpi_fr_offsets[10] = offsetof(fr_t, engine);
+    mpi_fr_offsets[11] = offsetof(fr_t, fractal_type);
+    mpi_fr_offsets[12] = offsetof(fr_t, fractal_flags);
+    mpi_fr_offsets[13] = offsetof(fr_t, num_workers);
 
     MPI_Type_create_struct(mpi_fr_numitems, mpi_fr_blocklengths, mpi_fr_offsets, mpi_fr_types, &mpi_fr_t);
     MPI_Type_commit(&mpi_fr_t);
@@ -351,10 +347,10 @@ void start_compute() {
 
 
             C_TIME(tp_compute,
-                if (engine == E_C) {
+                if (fr.engine == FR_E_C) {
                     log_trace("mand_c starting");
                     calc_c(fr, compute_rank, fr.num_workers, compute_buffer);
-                } else if (engine == E_CUDA) {
+                } else if (fr.engine == FR_E_CUDA) {
                     log_trace("mand_cuda starting");
                     CUDA_EXEC
                 } else {

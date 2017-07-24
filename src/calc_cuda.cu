@@ -187,13 +187,16 @@ void cuda_kernel(fr_t fr, int tid, int threads, unsigned char * col, int ncol, u
     double min_mag;
     int min_mag_ci;
 
+    // c componenets, and temporary variables
+    double c_r, c_i, _t0, _t1, _t2, _t3;
+
     // real, imaginary
     cuDoubleComplex z, c;
-
-    c = ccreate(
-        fr.cX - (fr.w - 2 * px) / (fr.Z * fr.w),
-        fr.cY + (fr.h - 2 * py) / (fr.Z * fr.w)
-    );
+    
+    c_r = fr.cX - (fr.w - 2 * px) / (fr.Z * fr.w);
+    c_i = fr.cY + (fr.h - 2 * py) / (fr.Z * fr.w);
+    
+    c = ccreate(c_r, c_i);
 
     z = c;
 
@@ -207,17 +210,17 @@ void cuda_kernel(fr_t fr, int tid, int threads, unsigned char * col, int ncol, u
                 ci = fr.max_iter;
                 fri = ci + 0.0;
             } else {
-                min_mag = cabs(z);
-                min_mag_ci = 0;
-                for (ci = 0; ci < fr.max_iter && cabs(z) < 16.0; ++ci) {
-                    z = cuCsqr(z);
-                    z = cuCadd(z, c);
-                    if (cabs(z) < min_mag) {
-                        min_mag = cabs(z);
-                        min_mag_ci = ci;
-                    }
+                _t0 = z.x * z.x;
+                _t1 = z.y * z.y;
+                for (ci = 0; ci < fr.max_iter && _t0 + _t1 < 256.0; ++ci) {
+                    _t2 = 2 * z.x * z.y;
+                    z.x = _t0 - _t1 + c_r;
+                    z.y = _t2 + c_i;
+                    _t0 = z.x * z.x; _t1 = z.y * z.y;
+                    //z = cuCsqr(z);
+                    //z = cuCadd(z, c);
                 }
-                tmp = log(log(cabs2(z)));
+                tmp = log(log(_t0 + _t1));
                 fri = 2.0 + ci - tmp / log(2.0);
             }
             break;

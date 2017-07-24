@@ -37,6 +37,9 @@ can also find a copy at http://www.gnu.org/licenses/.
 // thus, to linearly scale between -1.0 and 1.0, divide the input by AXIS_MAX
 #define AXIS_MAX (32717.0f)
 
+// signum function
+#define sgn(x) ((x) > 0 ? 1 : ((x) < 0) ? -1 : 0)
+
 
 // SDL error handling macro. if the SDL function returns an error, it prints
 // out the integer code, and prints the SDL error string for last error.
@@ -55,9 +58,25 @@ int sdl_hndl_res;
 #define MIN(a, b) ((a) > (b) ? (a) : (b) )
 #define FONT_SIZE           (MIN(14, fr.h/24))
 
+// graph width and height (bottom right)
+#define GRAPH_W (10 * (FONT_SIZE))
+#define GRAPH_H (6 * (FONT_SIZE))
+
 
 // the last full-cycle FPS (what the user sees)
-double last_fps = 0.0;
+double last_fps = 0.0, last_draw_fps = 0.0, last_compute_fps = 0.0, 
+       last_transfer_fps = 0.0, last_decompress_fps = 0.0,
+       last_last_fps = 0.0;
+
+double last_graph_scale = 0.0;
+
+// array of graph scales per pixel
+double * graph_scale_array = NULL;
+int graph_scale_array_idx = 0;
+
+bool has_graphed = false;
+double graph_scale = 0.0;
+
 
 // stores the ratio of compressed data to expanded data
 double compress_rate = 0.0;
@@ -104,11 +123,19 @@ SDL_Window *window;
 SDL_Surface *surface;
 SDL_Surface *screen;
 SDL_Texture *texture;
+SDL_Texture *graph_texture;
 TTF_Font *font;
 SDL_Surface * tsurface;
 SDL_Rect offset;
 SDL_Renderer * renderer;
 SDL_Texture *message_texture;
+
+// texture memory
+unsigned char * graph_texture_pixels = NULL;
+
+// current pixel on the graph
+int graph_cpixel = 0;
+
 
 
 int * recv_nbytes = NULL;
@@ -203,11 +230,12 @@ void gather_picture() {
     )
 
     MPI_Barrier(MPI_COMM_WORLD);
-
-    
+    last_transfer_fps = 1.0 / tp_recv.elapsed_s;
+    last_decompress_fps = 1.0 / tp_decompress.elapsed_s;
+    last_compute_fps = 1.0 / tp_compute.elapsed_s;
     compress_rate = total_compressed_bytes / (4 * fr.w * fr.h);
     log_info("Mb/s: %.2lf", total_compressed_bytes / (1e6 * tp_recv.elapsed_s));
-    log_debug("compute tfps: %.2lf, recv tfps: %.2lf, decompress tfps: %.2lf, compression ratio: %.2lf", 1.0 / tp_compute.elapsed_s, 1.0 / tp_recv.elapsed_s, 1.0 / tp_decompress.elapsed_s, compress_rate);
+    log_debug("compute tfps: %.2lf, recv tfps: %.2lf, decompress tfps: %.2lf, compression ratio: %.2lf", last_compute_fps, last_transfer_fps, last_decompress_fps, compress_rate);
 }
 
 // refreshes the whole window, recalculating if needed
@@ -221,7 +249,13 @@ void window_refresh() {
     offset.w = fr.w / 6;
     offset.h = fr.h / 6;
 
-    int i;
+    SDL_Rect graph_offset = (SDL_Rect){0, 0, 0, 0};
+    graph_offset.w = GRAPH_W;
+    graph_offset.h = GRAPH_H;
+    graph_offset.x = fr.w - graph_offset.w;
+    graph_offset.y = fr.h - graph_offset.h;
+
+    int i, j, ri, ri_s, ri_d;
     
     // get the window surface again, just in case something changed
     screen = SDL_GetWindowSurface(window);
@@ -246,11 +280,117 @@ void window_refresh() {
     C_TIME(tp_draw, 
         // start rendering, we need to clear the render instance
         SDL_RenderClear(renderer);
+        //bool scale_wholegraph = false;
+        double total_time = 1.0 / last_fps;
+        if (isinf(total_time)) total_time = 0.03;
+        double ltotal_time = 1.0 / last_last_fps;
+        
+        graph_scale = total_time;
+        
+        for (i = 0; i < GRAPH_W; ++i) {
+             if (graph_scale_array[i] > graph_scale && graph_scale_array[i] < 10.0) {
+                 graph_scale = graph_scale_array[i];
+             }
+        }
+        
+        if (!has_graphed) {
+            graph_scale = 0.03;
+            last_graph_scale = 0.03;
+        }
+
+        graph_scale_array[graph_scale_array_idx] = total_time;
+        
+//        log_trace("graph scale: %lf, lgraph: %lf", graph_scale, lgraph_scale);
+
+        graph_scale_array_idx = (graph_scale_array_idx + 1) % GRAPH_W;
+        has_graphed = true;
+         
+        //strncpy(graph_texture_pixels, graph_texture_pixels + (4 * GRAPH_H), 4 * (GRAPH_H-1)*GRAPH_W);
+        for (i = 1; i < GRAPH_W; ++i) {
+            for (j = 0; j < GRAPH_H; ++j) {
+                ri_d = 4 * ((GRAPH_H - j - 1) * GRAPH_W + i - 1);
+                if (GRAPH_H - (int)floor(j * graph_scale / last_graph_scale) - 1 < 0) {
+                    graph_texture_pixels[ri_d + 0] = 0;
+                    graph_texture_pixels[ri_d + 1] = 0;
+                    graph_texture_pixels[ri_d + 2] = 0;
+                    graph_texture_pixels[ri_d + 3] = 200;
+                } else {
+                    ri_s = 4 * ((GRAPH_H - (int)floor(j * graph_scale / last_graph_scale) - 1) * GRAPH_W + i);
+                    graph_texture_pixels[ri_d + 0] = graph_texture_pixels[ri_s + 0];
+                    graph_texture_pixels[ri_d + 1] = graph_texture_pixels[ri_s + 1];
+                    graph_texture_pixels[ri_d + 2] = graph_texture_pixels[ri_s + 2];
+                    graph_texture_pixels[ri_d + 3] = graph_texture_pixels[ri_s + 3];
+                }
+            }
+        }
+        // so far graphed
+        for (i = GRAPH_W - 1; i < GRAPH_W; ++i) {
+            double sfg = graph_scale;/*
+            for (j = GRAPH_H - 1; j >= GRAPH_H * (sfg - total_time) / graph_scale && j >= 0; j--) {
+                ri = 4 * (j * GRAPH_W + i);
+                // this (compute time) shows up in blue
+                graph_texture_pixels[ri + 0] = 0;
+                graph_texture_pixels[ri + 1] = 0;
+                graph_texture_pixels[ri + 2] = 0;
+                graph_texture_pixels[ri + 3] = 200;
+            }
+            sfg -= total_time;*/
+            for (; j >= GRAPH_H * (sfg - 1.0 / last_compute_fps) / graph_scale && j >= 0; j--) {
+                ri = 4 * (j * GRAPH_W + i);
+                // this (compute time) shows up in blue
+                graph_texture_pixels[ri + 0] = 255;
+                graph_texture_pixels[ri + 1] = 0;
+                graph_texture_pixels[ri + 2] = 0;
+                graph_texture_pixels[ri + 3] = 200;
+            }
+            sfg -= 1.0 / last_compute_fps;
+            for (; j >= GRAPH_H * (sfg - 1.0 / last_transfer_fps) / graph_scale && j >= 0; j--) {
+                ri = 4 * (j * GRAPH_W + i);
+                // transfer time shows up in green
+                graph_texture_pixels[ri + 0] = 0;
+                graph_texture_pixels[ri + 1] = 255;
+                graph_texture_pixels[ri + 2] = 0;
+                graph_texture_pixels[ri + 3] = 200;
+            }
+            sfg -= 1.0 / last_transfer_fps;
+            for (; j >= GRAPH_H * (sfg - 1.0 / last_decompress_fps) / graph_scale && j >= 0; j--) {
+                ri = 4 * (j * GRAPH_W + i);
+                // decompression time shows up in red
+                graph_texture_pixels[ri + 0] = 0;
+                graph_texture_pixels[ri + 1] = 0;
+                graph_texture_pixels[ri + 2] = 255;
+                graph_texture_pixels[ri + 3] = 200;
+            }
+            sfg -= 1.0 / last_decompress_fps;
+            for (; j >= GRAPH_H * (sfg - 1.0 / last_draw_fps) / graph_scale && j >= 0; j--) {
+                ri = 4 * (j * GRAPH_W + i);
+                // draw time shows up in white
+                graph_texture_pixels[ri + 0] = 255;
+                graph_texture_pixels[ri + 1] = 255;
+                graph_texture_pixels[ri + 2] = 255;
+                graph_texture_pixels[ri + 3] = 200;
+            }
+            sfg -= 1.0 / last_draw_fps;
+            for (; j >= 0; j--) {
+                ri = 4 * (j * GRAPH_W + i);
+                // misc shows up in black
+                graph_texture_pixels[ri + 0] = 0;
+                graph_texture_pixels[ri + 1] = 0;
+                graph_texture_pixels[ri + 2] = 0;
+                graph_texture_pixels[ri + 3] = 200;
+            }
+        }
+        //memset(graph_texture_pixels + 4 * (GRAPH_H-1) * GRAPH_W, 0, 4 * GRAPH_W);
+        //graph_cpixel++;
+        SDL_UpdateTexture(graph_texture, NULL, graph_texture_pixels, 4 * GRAPH_W);
         SDL_UpdateTexture(texture, NULL, pixels, 4 * fr.w);
         SDL_RenderCopy(renderer, texture, NULL, NULL);
+        SDL_RenderCopy(renderer, graph_texture, NULL, &graph_offset);
+ //   	SDL_RenderPresent(renderer);
     )
+    last_draw_fps = 1.0 / tp_draw.elapsed_s;
     
-
+    last_graph_scale = graph_scale;
     if (show_text_info) {
         log_trace("showing text info");
         
@@ -268,24 +408,31 @@ void window_refresh() {
         }
 
         sprintf(onscreen_message[0], "%s", fractal_types_names[fractal_types_idx]);
-        sprintf(onscreen_message[1], "%s", "-");
-        sprintf(onscreen_message[2], "center:%.10lf%+.10lf", fr.cX, fr.cY);
-        sprintf(onscreen_message[3], "zoom: %.2e", fr.Z);
-        sprintf(onscreen_message[4], "iter: %d", fr.max_iter);
-        sprintf(onscreen_message[5], "workers: %d", fr.num_workers);
+        sprintf(onscreen_message[1], "fps: %.2lf", 1.0 / (tp_gp.elapsed_s + tp_draw.elapsed_s));
+        sprintf(onscreen_message[2], "re(center): %+.14lf", fr.cX);
+        sprintf(onscreen_message[3], "im(center): %+.14lf", fr.cY);
+        sprintf(onscreen_message[4], "zoom: %.2e", fr.Z);
+        sprintf(onscreen_message[5], "iter: %d", fr.max_iter);
+        sprintf(onscreen_message[6], "workers: %d", fr.num_workers);
+        switch (fr.engine) {
+            case FR_E_C:
+                sprintf(onscreen_message[7], "engine: c");
+                break;
+            case FR_E_CUDA:
+                sprintf(onscreen_message[7], "engine: cuda");
+                break;
+            default:
+                break;
+        }
         //sprintf(onscreen_message[6], "compute fps: %2.1lf", 1.0 / (tp_gp.elapsed_s));
         //sprintf(onscreen_message[7], "draw fps: %2.1lf", 1.0 / (tp_draw.elapsed_s + tp_textdraw.elapsed_s));
         C_TIME(tp_textdraw,
             int max_w = 0;
             for (i = 0; i < NUM_ONSCREEN_MESSAGE; ++i) {
                 if (strlen(onscreen_message[i]) > 0) {
-                    if (strlen(onscreen_message[i]) > 1) {
-                        tsurface = TTF_RenderText_Solid(font, onscreen_message[i], text_color);
-                        if (tsurface->w > max_w) max_w = tsurface->w;
-                        text_box_offset.h += tsurface->h;
-                    } else {
-                        text_box_offset.h += FONT_SIZE;
-                    }
+                    tsurface = TTF_RenderText_Solid(font, onscreen_message[i], text_color);
+                    if (tsurface->w > max_w) max_w = tsurface->w;
+                    text_box_offset.h += tsurface->h;
 
                 }
             }
@@ -299,27 +446,21 @@ void window_refresh() {
                     offset.h = tsurface->h;
                     message_texture = SDL_CreateTextureFromSurface(renderer, tsurface);
                     SDL_RenderCopy(renderer, message_texture, NULL, &offset);
-                    offset.y += FONT_SIZE;
+                    offset.y += tsurface->h;
                 }
             }
         )
         
-        sprintf(onscreen_message[1], "fps: %.2lf", 1.0 / (tp_draw.elapsed_s + tp_gp.elapsed_s));
-        tsurface = TTF_RenderText_Solid(font, onscreen_message[1], text_color);
-        log_trace("created surface");
-        message_texture = SDL_CreateTextureFromSurface(renderer, tsurface);
-        offset.y = FONT_SIZE;
-        SDL_RenderCopy(renderer, message_texture, NULL, &offset);
     }
-
 
     SDL_RenderPresent(renderer);
     
+    last_last_fps = last_fps;
     last_fps = 1.0 / (tp_gp.elapsed_s + tp_draw.elapsed_s);
 
     // logging basic info
     log_info("fps: %.2lf, gather_picture() fps: %.2lf", last_fps, 1.0 / tp_gp.elapsed_s);
-    log_debug("draw fps: %.2lf, text draw fps: %.2lf", 1.0 / tp_draw.elapsed_s, 1.0 / tp_textdraw.elapsed_s);
+    log_debug("draw fps: %.2lf, text draw fps: %.2lf", last_draw_fps, 1.0 / tp_textdraw.elapsed_s);
 
 
 }
@@ -404,7 +545,27 @@ void fractalexplorer_render(int * argc, char ** argv) {
     
 
     texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, fr.w, fr.h);
-    
+    graph_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, GRAPH_W, GRAPH_H);   
+
+    graph_scale_array = malloc(GRAPH_W * sizeof(double));
+    int i;
+    for (i = 0; i < GRAPH_W; ++i) {
+        graph_scale_array[i] = 0;
+    } 
+    graph_texture_pixels = malloc(4 * GRAPH_W * GRAPH_H);
+    memset(graph_texture_pixels, 0, 4 * GRAPH_W * GRAPH_H);
+/*
+    int i, j, ri;
+    for (i = 0; i < GRAPH_W; i++) {
+        for (j = 0; j < GRAPH_H; ++j) { 
+            ri = 4 * (j * GRAPH_W + i);
+            graph_texture_pixels[ri + 0] = 0;
+            graph_texture_pixels[ri + 1] = 255;
+            graph_texture_pixels[ri + 2] = 0;
+            graph_texture_pixels[ri + 3] = 255;
+        }
+    }
+*/
     /*
     if (surface == NULL) {
         log_error("SDL failed to create surface: %s", SDL_GetError());
@@ -421,30 +582,31 @@ void fractalexplorer_render(int * argc, char ** argv) {
     bool keep_going = true;
     bool inner_keep_going = true;
     bool update = true;
+    bool reset_fr = false;
 
     bool r_down = false, l_down = false;
     bool s_down = false;
-    int horiz_v = 0, vert_v = 0, zoom_v = 0;
+    double horiz_v = 0, vert_v = 0, zoom_v = 0;
 
     int last_ticks = SDL_GetTicks();
 
     while (keep_going == true) {
         //log_trace("outer loop");
         update = false;
+        reset_fr = false;
         inner_keep_going = true;
         if (USE_JOYSTICK) {
             update = horiz_v != 0 || vert_v != 0 || zoom_v != 0;
             if (update) {
                 double scale_allinput = (double)(SDL_GetTicks() - last_ticks) / 1000.0;
-                fr.cX += 1.4 * scale_allinput * horiz_v / (AXIS_MAX * fr.Z);
-                fr.cY -= 1.4 * scale_allinput * vert_v / (AXIS_MAX * fr.Z);
-                double zfact = 1.0 + 1.4 * scale_allinput * abs(zoom_v) / AXIS_MAX;
+                fr.cX += 1.0 * scale_allinput * horiz_v / (fr.Z);
+                fr.cY -= 1.0 * scale_allinput * vert_v / (fr.Z);
+                double zfact = 1.0 + 1.0 * scale_allinput * abs(zoom_v);
                 if (zoom_v > 0) {
                     fr.Z /= zfact;
                 } else if (zoom_v < 0) {
                     fr.Z *= zfact;
                 }
-                last_ticks = SDL_GetTicks();
             }
             /*
             if (update) {
@@ -452,6 +614,7 @@ void fractalexplorer_render(int * argc, char ** argv) {
             }
             */
         }
+        last_ticks = SDL_GetTicks();
 
         while (SDL_PollEvent(&cevent)) {
             if (inner_keep_going) {
@@ -459,14 +622,28 @@ void fractalexplorer_render(int * argc, char ** argv) {
                     case SDL_JOYAXISMOTION:
                         log_trace("joystick axis");
                         if (cevent.jaxis.axis == horiz) {
-                            horiz_v = SMASH(cevent.jaxis.value, AXIS_MAX * .05f);
+                            horiz_v = SMASH(cevent.jaxis.value, 0) / AXIS_MAX;
+                            horiz_v = sgn(horiz_v) * pow(fabs(horiz_v), .333);
                         }
                         if (cevent.jaxis.axis == vert) {
-                            vert_v = SMASH(cevent.jaxis.value, AXIS_MAX * .05f);
+                            vert_v = SMASH(cevent.jaxis.value, 0) / AXIS_MAX;
+                            vert_v = sgn(vert_v) * pow(fabs(vert_v), .333);
                         }
                         if (cevent.jaxis.axis == zaxis) {
-                            zoom_v = SMASH(cevent.jaxis.value, AXIS_MAX * .05f);
+                            zoom_v = SMASH(cevent.jaxis.value, 0) / AXIS_MAX;
+                            zoom_v = sgn(zoom_v) * pow(fabs(zoom_v), .333);
                         }
+                        break;
+                    case SDL_JOYDEVICEREMOVED:
+                        log_info("joystick index removed: %d", cevent.jdevice.which);
+                        joystick = NULL;
+                        break;
+                    case SDL_JOYDEVICEADDED:
+                        log_info("joystick index added: %d", cevent.jdevice.which);
+                        if (joystick == NULL) {
+                            log_info("using joystick: %d", cevent.jdevice.which);
+                        }
+                        joystick = SDL_JoystickOpen(cevent.jdevice.which);
                         break;
                     case SDL_QUIT:
                         log_info("SDL_Quit event");
@@ -526,10 +703,12 @@ void fractalexplorer_render(int * argc, char ** argv) {
                             fractal_types_idx = (fractal_types_idx + 1) % FR_FRACTAL_NUM;
                             fr.fractal_type = fractal_types[fractal_types_idx];
                             update = true;
+                            reset_fr = true;
                         } else if (cevent.key.keysym.sym == 'n' && cevent.key.repeat == 0) {
                             fractal_types_idx = (fractal_types_idx - 1 + FR_FRACTAL_NUM) % FR_FRACTAL_NUM;
                             fr.fractal_type = fractal_types[fractal_types_idx];
                             update = true;
+                            reset_fr = true;
                         }
                         break;
                     case SDL_MOUSEMOTION:
@@ -573,7 +752,12 @@ void fractalexplorer_render(int * argc, char ** argv) {
         if (!keep_going) {
             break;
         }
-        if (update) {
+        if (update || reset_fr) {
+            if (reset_fr) {
+                log_trace("resetting fractal");
+                fr.cX = 0; fr.cY = 0;
+                fr.Z = .4;
+            }
             log_trace("recomputing fractal");
             window_refresh();
             //_fr_interactive_sdl_recompute(fr, fr_engine);
