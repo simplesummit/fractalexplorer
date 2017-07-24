@@ -304,7 +304,7 @@ void window_refresh() {
             }
         )
         
-        sprintf(onscreen_message[1], "fps: %.2lf", 1.0 / (tp_wr.elapsed_s + tp_gp.elapsed_s + tp_draw.elapsed_s));
+        sprintf(onscreen_message[1], "fps: %.2lf", 1.0 / (tp_draw.elapsed_s + tp_gp.elapsed_s));
         tsurface = TTF_RenderText_Solid(font, onscreen_message[1], text_color);
         log_trace("created surface");
         message_texture = SDL_CreateTextureFromSurface(renderer, tsurface);
@@ -315,12 +315,12 @@ void window_refresh() {
 
     SDL_RenderPresent(renderer);
     
+    last_fps = 1.0 / (tp_gp.elapsed_s + tp_draw.elapsed_s);
 
     // logging basic info
-    log_info("fps: %.2lf, gather_picture() fps: %.2lf", 1.0 / (tp_wr.elapsed_s + tp_gp.elapsed_s + tp_draw.elapsed_s + tp_textdraw.elapsed_s), 1.0 / tp_gp.elapsed_s);
+    log_info("fps: %.2lf, gather_picture() fps: %.2lf", last_fps, 1.0 / tp_gp.elapsed_s);
     log_debug("draw fps: %.2lf, text draw fps: %.2lf", 1.0 / tp_draw.elapsed_s, 1.0 / tp_textdraw.elapsed_s);
 
-    last_fps = 1.0 / (tp_wr.elapsed_s + tp_gp.elapsed_s + tp_draw.elapsed_s + tp_textdraw.elapsed_s);
 
 }
 

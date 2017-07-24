@@ -325,7 +325,7 @@ void start_compute() {
 // macro to fail if we don't have cuda
 
 #ifdef HAVE_CUDA
-#define CUDA_EXEC log_trace("mand_cuda starting"); calc_cuda(fr, col, compute_rank, fr.num_workers, pixels);
+#define CUDA_EXEC log_trace("mand_cuda starting"); calc_cuda(fr, col, compute_rank, fr.num_workers, compute_buffer);
 #else
 #define CUDA_EXEC log_fatal("wasn't compiled with CUDA support"); M_EXIT(1);
 #endif
