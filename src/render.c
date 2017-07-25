@@ -592,6 +592,7 @@ void fractalexplorer_render(int * argc, char ** argv) {
 
     while (keep_going == true) {
         //log_trace("outer loop");
+        // set this to true to fore compute each time
         update = false;
         reset_fr = false;
         inner_keep_going = true;
@@ -656,7 +657,13 @@ void fractalexplorer_render(int * argc, char ** argv) {
                         }
                         break;
                     case SDL_KEYDOWN:
-                        if (cevent.key.keysym.sym == ' ') {
+                        // quit
+                        if (cevent.key.keysym.sym == 'q') {
+                            MPI_Abort(MPI_COMM_WORLD, 0);
+                        } else if (cevent.key.keysym.sym == 'e') {
+                            // hard exit, non-zero status. Some scripts may choose to restart if non-zero
+                            MPI_Abort(MPI_COMM_WORLD, 123);
+                        } else if (cevent.key.keysym.sym == ' ') {
                             if (s_down) {
                                 fr.Z /= 1.5;
                             } else {
@@ -767,7 +774,7 @@ void fractalexplorer_render(int * argc, char ** argv) {
 
     log_info("quitting now");
 
-    exit(0);
+    MPI_Abort(MPI_COMM_WORLD, 0);
 }
 
 
