@@ -190,6 +190,10 @@ void calc_c(fr_t fr, int tid, int threads, unsigned char * output) {
                             _t5 = _t3 * _t3;
                         }
 
+                        // if using the optimized version, set z to the optimized
+                        // result
+                        z = _t2 + I * _t3;
+
                         // this is part of the fractional iteration count, and
                         // the divisor (by default log(2.0)) can be changed for
                         // interesting effects. For example, try 2.5 for a `tank
