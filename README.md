@@ -2,6 +2,8 @@
 
 This is a repository for simulation and interactive program to be ran on leconte
 
+![usage image](http://github.com/ornl-leconte/fractalexplorer/picture_0.png)
+
 ## Requirements
 
 Currently, this is only known to work on MacOS, Linux, either my personal desktop, or a Jetson TX2 (which is what leconte uses).
