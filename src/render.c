@@ -689,54 +689,54 @@ void fractalexplorer_render(int * argc, char ** argv) {
                         break;
                     case SDL_KEYDOWN:
                         // quit
-                        if (cevent.key.keysym.sym == 'q') {
+                        if (cevent.key.keysym.sym == 'q' && cevent.key.repeat == 0) {
                             MPI_Abort(MPI_COMM_WORLD, 0);
-                        } else if (cevent.key.keysym.sym == 'e') {
+                        } else if (cevent.key.keysym.sym == 'e' && cevent.key.repeat == 0) {
                             // hard exit, non-zero status. Some scripts may choose to restart if non-zero
                             MPI_Abort(MPI_COMM_WORLD, 123);
-                        } else if (cevent.key.keysym.sym == ' ') {
+                        } else if (cevent.key.keysym.sym == ' ' && cevent.key.repeat == 0) {
                             if (s_down) {
                                 fr.Z /= 1.5;
                             } else {
                                 fr.Z *= 1.5;
                             }
                             update = true; update_anim = true;
-                        } else if (cevent.key.keysym.sym == SDLK_LSHIFT || cevent.key.keysym.sym == SDLK_RSHIFT) {
+                        } else if (cevent.key.keysym.sym == SDLK_LSHIFT || cevent.key.keysym.sym == SDLK_RSHIFT && cevent.key.repeat == 0) {
                             s_down = true;
                             //fr.Z /= 1.5;
-                        } else if (cevent.key.keysym.sym == SDLK_LEFT) {
+                        } else if (cevent.key.keysym.sym == SDLK_LEFT && cevent.key.repeat == 0) {
                             fr.cX -= .15 / fr.Z;
                             update = true; update_anim = true;
-                        } else if (cevent.key.keysym.sym == SDLK_RIGHT) {
+                        } else if (cevent.key.keysym.sym == SDLK_RIGHT && cevent.key.repeat == 0) {
                             fr.cX += .15 / fr.Z;
                             update = true;
-                        } else if (cevent.key.keysym.sym == SDLK_UP) {
+                        } else if (cevent.key.keysym.sym == SDLK_UP && cevent.key.repeat == 0) {
                             fr.cY += .15 / fr.Z;
                             update = true; update_anim = true;
-                        } else if (cevent.key.keysym.sym == SDLK_DOWN) {
+                        } else if (cevent.key.keysym.sym == SDLK_DOWN && cevent.key.repeat == 0) {
                             fr.cY -= .15 / fr.Z;
                             update = true; update_anim = true;
-                        } else if (cevent.key.keysym.sym == SDLK_ESCAPE) {
+                        } else if (cevent.key.keysym.sym == SDLK_ESCAPE && cevent.key.repeat == 0) {
                             keep_going = false;
                             inner_keep_going = false;
                             log_info("escaping program");
                             MPI_Abort(MPI_COMM_WORLD, 0);
-                        } else if (cevent.key.keysym.sym == 'p') {
+                        } else if (cevent.key.keysym.sym == 'p' && cevent.key.repeat == 0) {
                             fr.max_iter += 1;
                             update = true;// update_anim = true;
-                        } else if (cevent.key.keysym.sym == 'z') {
+                        } else if (cevent.key.keysym.sym == 'z' && cevent.key.repeat == 0) {
                             // toggle simple coloring
                             fr.fractal_flags ^= FRF_SIMPLE;
                             update = true;
-                        } else if (cevent.key.keysym.sym == 'x') {
+                        } else if (cevent.key.keysym.sym == 'x' && cevent.key.repeat == 0) {
                             // toggle re() binary decomposition
                             fr.fractal_flags ^= FRF_BINARYDECOMP_REAL;
                             update = true;
-                        } else if (cevent.key.keysym.sym == 'c') {
+                        } else if (cevent.key.keysym.sym == 'c' && cevent.key.repeat == 0) {
                             // toggle im() binary decomposition
                             fr.fractal_flags ^= FRF_BINARYDECOMP_IMAG;
                             update = true;
-                        } else if (cevent.key.keysym.sym == 'o') {
+                        } else if (cevent.key.keysym.sym == 'o' && cevent.key.repeat == 0) {
                             if (fr.max_iter > 0) {
                                 fr.max_iter -= 1;
                                 update = true;
