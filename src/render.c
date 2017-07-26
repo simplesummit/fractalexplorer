@@ -106,7 +106,7 @@ SDL_Event cevent;
 SDL_Joystick *joystick = NULL;
 
 // timeout to demo
-int timeout = 1;
+int timeout = 8;
 
 // current animation
 int curr_anim = 0;
@@ -593,23 +593,6 @@ void fractalexplorer_render(int * argc, char ** argv) {
     }
     graph_texture_pixels = malloc(4 * GRAPH_W * GRAPH_H);
     memset(graph_texture_pixels, 0, 4 * GRAPH_W * GRAPH_H);
-/*
-    int i, j, ri;
-    for (i = 0; i < GRAPH_W; i++) {
-        for (j = 0; j < GRAPH_H; ++j) {
-            ri = 4 * (j * GRAPH_W + i);
-            graph_texture_pixels[ri + 0] = 0;
-            graph_texture_pixels[ri + 1] = 255;
-            graph_texture_pixels[ri + 2] = 0;
-            graph_texture_pixels[ri + 3] = 255;
-        }
-    }
-*/
-    /*
-    if (surface == NULL) {
-        log_error("SDL failed to create surface: %s", SDL_GetError());
-    }
-    */
 
     MPI_Bcast(&fr, 1, mpi_fr_t, 0, MPI_COMM_WORLD);
 
@@ -622,6 +605,7 @@ void fractalexplorer_render(int * argc, char ** argv) {
     bool inner_keep_going = true;
     bool update = true;
     bool reset_fr = false;
+    bool update_anim = true;
 
     bool r_down = false, l_down = false;
     bool s_down = false;
@@ -639,11 +623,13 @@ void fractalexplorer_render(int * argc, char ** argv) {
         //log_trace("outer loop");
         // set this to true to fore compute each time
         update = false;
+        update_anim = false;
         reset_fr = false;
         inner_keep_going = true;
         if (USE_JOYSTICK) {
             update = horiz_v != 0 || vert_v != 0 || zoom_v != 0;
             if (update) {
+                update_anim = true;
                 double scale_allinput = (double)(SDL_GetTicks() - last_ticks) / 1000.0;
                 fr.cX += 1.0 * scale_allinput * horiz_v / (fr.Z);
                 fr.cY -= 1.0 * scale_allinput * vert_v / (fr.Z);
@@ -668,15 +654,15 @@ void fractalexplorer_render(int * argc, char ** argv) {
                     case SDL_JOYAXISMOTION:
                         log_trace("joystick axis");
                         if (cevent.jaxis.axis == horiz) {
-                            horiz_v = SMASH(cevent.jaxis.value, 400) / AXIS_MAX;
+                            horiz_v = SMASH(cevent.jaxis.value, 100) / AXIS_MAX;
                             //horiz_v = sgn(horiz_v) * pow(fabs(horiz_v), .333);
                         }
                         if (cevent.jaxis.axis == vert) {
-                            vert_v = SMASH(cevent.jaxis.value, 400) / AXIS_MAX;
+                            vert_v = SMASH(cevent.jaxis.value, 100) / AXIS_MAX;
                             //vert_v = sgn(vert_v) * pow(fabs(vert_v), .333);
                         }
                         if (cevent.jaxis.axis == zaxis) {
-                            zoom_v = SMASH(cevent.jaxis.value, 400) / AXIS_MAX;
+                            zoom_v = SMASH(cevent.jaxis.value, 100) / AXIS_MAX;
                             //zoom_v = sgn(zoom_v) * pow(fabs(zoom_v), .333);
                         }
                         break;
@@ -714,22 +700,22 @@ void fractalexplorer_render(int * argc, char ** argv) {
                             } else {
                                 fr.Z *= 1.5;
                             }
-                            update = true;
+                            update = true; update_anim = true;
                         } else if (cevent.key.keysym.sym == SDLK_LSHIFT || cevent.key.keysym.sym == SDLK_RSHIFT) {
                             s_down = true;
                             //fr.Z /= 1.5;
                         } else if (cevent.key.keysym.sym == SDLK_LEFT) {
                             fr.cX -= .15 / fr.Z;
-                            update = true;
+                            update = true; update_anim = true;
                         } else if (cevent.key.keysym.sym == SDLK_RIGHT) {
                             fr.cX += .15 / fr.Z;
                             update = true;
                         } else if (cevent.key.keysym.sym == SDLK_UP) {
                             fr.cY += .15 / fr.Z;
-                            update = true;
+                            update = true; update_anim = true;
                         } else if (cevent.key.keysym.sym == SDLK_DOWN) {
                             fr.cY -= .15 / fr.Z;
-                            update = true;
+                            update = true; update_anim = true;
                         } else if (cevent.key.keysym.sym == SDLK_ESCAPE) {
                             keep_going = false;
                             inner_keep_going = false;
@@ -737,6 +723,18 @@ void fractalexplorer_render(int * argc, char ** argv) {
                             MPI_Abort(MPI_COMM_WORLD, 0);
                         } else if (cevent.key.keysym.sym == 'p') {
                             fr.max_iter += 1;
+                            update = true;// update_anim = true;
+                        } else if (cevent.key.keysym.sym == 'z') {
+                            // toggle simple coloring
+                            fr.fractal_flags ^= FRF_SIMPLE;
+                            update = true;
+                        } else if (cevent.key.keysym.sym == 'x') {
+                            // toggle re() binary decomposition
+                            fr.fractal_flags ^= FRF_BINARYDECOMP_REAL;
+                            update = true;
+                        } else if (cevent.key.keysym.sym == 'c') {
+                            // toggle im() binary decomposition
+                            fr.fractal_flags ^= FRF_BINARYDECOMP_IMAG;
                             update = true;
                         } else if (cevent.key.keysym.sym == 'o') {
                             if (fr.max_iter > 0) {
@@ -745,23 +743,23 @@ void fractalexplorer_render(int * argc, char ** argv) {
                             }
                         } else if (cevent.key.keysym.sym == 'k' && cevent.key.repeat == 0) {
                             if (fr.num_workers < compute_size) {
-			                          fr.num_workers++;
+			        fr.num_workers++;
                                 update = true;
                             }
                         } else if (cevent.key.keysym.sym == 'j' && cevent.key.repeat == 0) {
                             if (fr.num_workers > 1) {
-			                    fr.num_workers--;
+			        fr.num_workers--;
                                 update = true;
                             }
                         } else if (cevent.key.keysym.sym == 'm' && cevent.key.repeat == 0) {
                             fractal_types_idx = (fractal_types_idx + 1) % FR_FRACTAL_NUM;
                             fr.fractal_type = fractal_types[fractal_types_idx];
-                            update = true;
+                            update = true; update_anim = true;
                             reset_fr = true;
                         } else if (cevent.key.keysym.sym == 'n' && cevent.key.repeat == 0) {
                             fractal_types_idx = (fractal_types_idx - 1 + FR_FRACTAL_NUM) % FR_FRACTAL_NUM;
                             fr.fractal_type = fractal_types[fractal_types_idx];
-                            update = true;
+                            update = true; update_anim = true;
                             reset_fr = true;
                         }
                         break;
@@ -769,7 +767,7 @@ void fractalexplorer_render(int * argc, char ** argv) {
                         if (l_down) {
                             fr.cX -= cevent.motion.xrel / (fr.Z * fr.w);
                             fr.cY += cevent.motion.yrel / (fr.Z * fr.w);
-                            update = true;
+                            update = true; update_anim = true;
                         }
                         if (r_down) {
                             double zoomin = 1 + fabs(2.0 * (cevent.motion.yrel + cevent.motion.xrel) / (fr.w + fr.h));
@@ -778,7 +776,7 @@ void fractalexplorer_render(int * argc, char ** argv) {
                             } else {
                                 fr.Z /= zoomin;
                             }
-                            update = true;
+                            update = true; update_anim = true;
                         }
                         break;
                     case SDL_MOUSEBUTTONDOWN:
@@ -806,16 +804,24 @@ void fractalexplorer_render(int * argc, char ** argv) {
         if (!keep_going) {
             break;
         }
+        if (update_anim) {
+            is_anim = false;
+        }
         if (update || reset_fr) {
             if (reset_fr) {
                 log_trace("resetting fractal");
                 fr.cX = 0; fr.cY = 0;
                 fr.Z = .4;
             }
-            is_anim = false;
+            //is_anim = false;
             log_trace("recomputing fractal");
-            window_refresh();
-            last_update_ticks = SDL_GetTicks();
+            //window_refresh();
+            if (num_animations == 0 || !is_anim) {
+                last_update_ticks = SDL_GetTicks();
+                is_anim = false;
+                window_refresh();
+            }
+            
             //_fr_interactive_sdl_recompute(fr, fr_engine);
         }
         if ((SDL_GetTicks() - last_update_ticks) / 1000 >= timeout + 1.0 / last_fps) {
@@ -858,8 +864,8 @@ void fractalexplorer_render(int * argc, char ** argv) {
               fr.cX = (1 - p) * (anim_start_cX) + (p * animations[curr_anim].cX);
               fr.cY = (1 - p) * (anim_start_cY) + (p * animations[curr_anim].cY);
               fr.Z = exp(log(anim_start_Z) * (1 - p) + p * log(animations[curr_anim].Z));
-              window_refresh();
             }
+            window_refresh();
         }
 
         //do_update = false;

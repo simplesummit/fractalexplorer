@@ -74,6 +74,16 @@ Keyboard arrows pan, space zooms in, and shift+space zooms out.
 
 `m` and `n` navigate through the fractal types
 
+`z` toggles simple or gradient coloring
+
+`x` toggles binary decomposition on the real component of z_n
+
+`c` toggles binary decomposition on the imaginary component of z_n`
+
+`esc` or `q` quit the program gracefully
+
+`e` exits with a non-zero return code (123)
+
 
 
 #### Mouse
