@@ -105,7 +105,6 @@ stamp-h1
 compileopencl.sh
 *.o
 
-*.png
 *.jpg
 *.jpeg
 *.gif
