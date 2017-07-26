@@ -73,6 +73,8 @@ fr_col_t col;
 
 char * csch = "green";
 
+char * fractal_path_file = "default.frpath";
+
 void mandelbrot_show_help() {
     printf("Usage: " PACKAGE " [-h]\n");
     printf("  -h             show this help menu\n");
@@ -81,6 +83,7 @@ void mandelbrot_show_help() {
     printf("  -M[N]          set height\n");
     printf("  -E[F]          set color index offset\n");
     printf("  -G[F]          set color index multiplyer\n");
+    printf("  -P[S]          set fractal path file name\n");
     printf("  -F             use fullscreen\n");
     printf("  -i[N]          set iterations\n");
     printf("  -x[F]          set center x\n");
@@ -99,7 +102,7 @@ void mandelbrot_show_help() {
 // returns exit code, or -1 if we shouldn't exit
 int parse_args(int argc, char ** argv) {
     char c;
-    while ((c = getopt(argc, argv, "v:N:M:E:G:i:e:k:x:y:z:c:Fh")) != GETOPT_STOP) {
+    while ((c = getopt(argc, argv, "v:N:P:M:E:G:i:e:k:x:y:z:c:Fh")) != GETOPT_STOP) {
 	switch (c) {
         case 'h':
     		    mandelbrot_show_help();
@@ -128,6 +131,9 @@ int parse_args(int argc, char ** argv) {
             break;
         case 'z':
             fr.Z = atof(optarg);
+            break;
+        case 'P':
+            fractal_path_file = optarg;
             break;
         case 'c':
             csch = optarg;
@@ -302,7 +308,7 @@ void start_compute() {
     int max_compress_size = LZ4_compressBound(4 * fr.w * fr.h);
     int compress_size;
 
-    unsigned char * compute_buffer = malloc(4 * fr.w * fr.h), 
+    unsigned char * compute_buffer = malloc(4 * fr.w * fr.h),
                   * compress_buffer = malloc(max_compress_size);
 
     tperf_t tp_compute, tp_compress, tp_send;
@@ -383,7 +389,7 @@ void start_compute() {
                 MPI_Ssend(compress_buffer, abs(compress_size), MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
             )
         }
-        
+
         log_debug("compute fps: %.2lf, compress fps: %.2lf", 1.0 / tp_compute.elapsed_s, 1.0 / tp_compress.elapsed_s);
 
         MPI_Barrier(MPI_COMM_WORLD);

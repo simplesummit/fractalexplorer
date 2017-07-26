@@ -64,7 +64,7 @@ int sdl_hndl_res;
 
 
 // the last full-cycle FPS (what the user sees)
-double last_fps = 0.0, last_draw_fps = 0.0, last_compute_fps = 0.0, 
+double last_fps = 0.0, last_draw_fps = 0.0, last_compute_fps = 0.0,
        last_transfer_fps = 0.0, last_decompress_fps = 0.0,
        last_last_fps = 0.0;
 
@@ -104,6 +104,23 @@ SDL_Event cevent;
 
 // a pointer to a joystick
 SDL_Joystick *joystick = NULL;
+
+// timeout to demo
+int timeout = 1;
+
+// current animation
+int curr_anim = 0;
+
+typedef struct anim_param_t {
+    // parameters to pan and zoom to
+    double cX, cY, Z;
+
+    // the animation duration
+    int ticks;
+} anim_param_t;
+
+int num_animations;
+anim_param_t * animations;
 
 
 // joystick axis numbers, should be found out using joytest or similar programs
@@ -183,12 +200,12 @@ void gather_picture() {
     }
 
     int bytes_per_compute = 4 * fr.w * fr.h / fr.num_workers;
-    
+
     double total_compressed_bytes = 0;
 
     tperf_t tp_compute;
     tperf_t tp_recv, tp_decompress;
-    
+
     C_TIME(tp_compute,
         MPI_Bcast(&fr, 1, mpi_fr_t, 0, MPI_COMM_WORLD);
 
@@ -256,10 +273,10 @@ void window_refresh() {
     graph_offset.y = fr.h - graph_offset.h;
 
     int i, j, ri, ri_s, ri_d;
-    
+
     // get the window surface again, just in case something changed
     screen = SDL_GetWindowSurface(window);
-    
+
     if (pixels == NULL) {
         log_trace("malloc'ing render pixels");
         if (pixels != NULL) {
@@ -277,34 +294,34 @@ void window_refresh() {
         gather_picture();
     )
 
-    C_TIME(tp_draw, 
+    C_TIME(tp_draw,
         // start rendering, we need to clear the render instance
         SDL_RenderClear(renderer);
         //bool scale_wholegraph = false;
         double total_time = 1.0 / last_fps;
         if (isinf(total_time)) total_time = 0.03;
         double ltotal_time = 1.0 / last_last_fps;
-        
+
         graph_scale = total_time;
-        
+
         for (i = 0; i < GRAPH_W; ++i) {
              if (graph_scale_array[i] > graph_scale && graph_scale_array[i] < 10.0) {
                  graph_scale = graph_scale_array[i];
              }
         }
-        
+
         if (!has_graphed) {
             graph_scale = 0.03;
             last_graph_scale = 0.03;
         }
 
         graph_scale_array[graph_scale_array_idx] = total_time;
-        
+
 //        log_trace("graph scale: %lf, lgraph: %lf", graph_scale, lgraph_scale);
 
         graph_scale_array_idx = (graph_scale_array_idx + 1) % GRAPH_W;
         has_graphed = true;
-         
+
         //strncpy(graph_texture_pixels, graph_texture_pixels + (4 * GRAPH_H), 4 * (GRAPH_H-1)*GRAPH_W);
         for (i = 1; i < GRAPH_W; ++i) {
             for (j = 0; j < GRAPH_H; ++j) {
@@ -389,11 +406,11 @@ void window_refresh() {
  //   	SDL_RenderPresent(renderer);
     )
     last_draw_fps = 1.0 / tp_draw.elapsed_s;
-    
+
     last_graph_scale = graph_scale;
     if (show_text_info) {
         log_trace("showing text info");
-        
+
         // first time through, allocated enough messages
         if (onscreen_message == NULL) {
             onscreen_message = malloc(NUM_ONSCREEN_MESSAGE * sizeof(char *));
@@ -450,11 +467,11 @@ void window_refresh() {
                 }
             }
         )
-        
+
     }
 
     SDL_RenderPresent(renderer);
-    
+
     last_last_fps = last_fps;
     last_fps = 1.0 / (tp_gp.elapsed_s + tp_draw.elapsed_s);
 
@@ -520,7 +537,7 @@ void fractalexplorer_render(int * argc, char ** argv) {
         log_info("not using joystick");
     }
 
-    
+
     OFONT("UbuntuMono.ttf");
     if (font == NULL) {
         OFONT("ubuntu-font-family/Ubuntu-R.ttf");
@@ -542,22 +559,44 @@ void fractalexplorer_render(int * argc, char ** argv) {
 
     SDL_RenderClear(renderer);
     SDL_RenderPresent(renderer);
-    
+
 
     texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, fr.w, fr.h);
-    graph_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, GRAPH_W, GRAPH_H);   
+    graph_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, GRAPH_W, GRAPH_H);
+
+    FILE * path_fp = fopen(fractal_path_file, "r");
+
+    if (path_fp == NULL) {
+        log_info("not using path file, couldn't open %s", fractal_path_file);
+        num_animations = 0;
+    } else {
+        #define FSF_CHK(n) if (fsf_res != n) { log_warn("parsing file failed, not using animations"); num_animations = 0; }
+        log_debug("using path file: %s", fractal_path_file);
+        int fsf_res = 0;
+        fsf_res = fscanf(path_fp, "%d\n", &num_animations);
+        FSF_CHK(1);
+        int k;
+        animations = malloc(sizeof (anim_param_t) * num_animations);
+        for (k=0;k<num_animations;k++) {
+          fsf_res = fscanf(path_fp, "%lf,%lf,%lf,%d\n", &animations[k].cX, &animations[k].cY, &animations[k].Z, &animations[k].ticks);
+          FSF_CHK(4);
+          log_debug("Animation point %d: %lf,%lf,%lf,%d\n", k, animations[k].cX, animations[k].cY, animations[k].Z, animations[k].ticks);
+        }
+        fclose(path_fp);
+    }
+
 
     graph_scale_array = malloc(GRAPH_W * sizeof(double));
     int i;
     for (i = 0; i < GRAPH_W; ++i) {
         graph_scale_array[i] = 0;
-    } 
+    }
     graph_texture_pixels = malloc(4 * GRAPH_W * GRAPH_H);
     memset(graph_texture_pixels, 0, 4 * GRAPH_W * GRAPH_H);
 /*
     int i, j, ri;
     for (i = 0; i < GRAPH_W; i++) {
-        for (j = 0; j < GRAPH_H; ++j) { 
+        for (j = 0; j < GRAPH_H; ++j) {
             ri = 4 * (j * GRAPH_W + i);
             graph_texture_pixels[ri + 0] = 0;
             graph_texture_pixels[ri + 1] = 255;
@@ -589,7 +628,13 @@ void fractalexplorer_render(int * argc, char ** argv) {
     double horiz_v = 0, vert_v = 0, zoom_v = 0;
 
     int last_ticks = SDL_GetTicks();
+    int last_update_ticks = SDL_GetTicks();
+    int last_anim_switch_ticks = SDL_GetTicks();
 
+    double anim_start_cX = fr.cX;
+    double anim_start_cY = fr.cY;
+    double anim_start_Z = fr.Z;
+    bool is_anim = false;
     while (keep_going == true) {
         //log_trace("outer loop");
         // set this to true to fore compute each time
@@ -623,16 +668,16 @@ void fractalexplorer_render(int * argc, char ** argv) {
                     case SDL_JOYAXISMOTION:
                         log_trace("joystick axis");
                         if (cevent.jaxis.axis == horiz) {
-                            horiz_v = SMASH(cevent.jaxis.value, 0) / AXIS_MAX;
-                            horiz_v = sgn(horiz_v) * pow(fabs(horiz_v), .333);
+                            horiz_v = SMASH(cevent.jaxis.value, 400) / AXIS_MAX;
+                            //horiz_v = sgn(horiz_v) * pow(fabs(horiz_v), .333);
                         }
                         if (cevent.jaxis.axis == vert) {
-                            vert_v = SMASH(cevent.jaxis.value, 0) / AXIS_MAX;
-                            vert_v = sgn(vert_v) * pow(fabs(vert_v), .333);
+                            vert_v = SMASH(cevent.jaxis.value, 400) / AXIS_MAX;
+                            //vert_v = sgn(vert_v) * pow(fabs(vert_v), .333);
                         }
                         if (cevent.jaxis.axis == zaxis) {
-                            zoom_v = SMASH(cevent.jaxis.value, 0) / AXIS_MAX;
-                            zoom_v = sgn(zoom_v) * pow(fabs(zoom_v), .333);
+                            zoom_v = SMASH(cevent.jaxis.value, 400) / AXIS_MAX;
+                            //zoom_v = sgn(zoom_v) * pow(fabs(zoom_v), .333);
                         }
                         break;
                     case SDL_JOYDEVICEREMOVED:
@@ -688,6 +733,8 @@ void fractalexplorer_render(int * argc, char ** argv) {
                         } else if (cevent.key.keysym.sym == SDLK_ESCAPE) {
                             keep_going = false;
                             inner_keep_going = false;
+                            log_info("escaping program");
+                            MPI_Abort(MPI_COMM_WORLD, 0);
                         } else if (cevent.key.keysym.sym == 'p') {
                             fr.max_iter += 1;
                             update = true;
@@ -765,10 +812,56 @@ void fractalexplorer_render(int * argc, char ** argv) {
                 fr.cX = 0; fr.cY = 0;
                 fr.Z = .4;
             }
+            is_anim = false;
             log_trace("recomputing fractal");
             window_refresh();
+            last_update_ticks = SDL_GetTicks();
             //_fr_interactive_sdl_recompute(fr, fr_engine);
         }
+        if ((SDL_GetTicks() - last_update_ticks) / 1000 >= timeout + 1.0 / last_fps) {
+            if (!is_anim) {
+              log_debug("starting auto-animation");
+              curr_anim = 0;
+              last_anim_switch_ticks = SDL_GetTicks();
+              anim_start_cX = fr.cX;
+              anim_start_cY = fr.cY;
+              anim_start_Z = fr.Z;
+            }
+            is_anim = true;
+            if (SDL_GetTicks() - last_anim_switch_ticks > animations[curr_anim].ticks) {
+                anim_start_cX = animations[curr_anim].cX;
+                anim_start_cY = animations[curr_anim].cY;
+                anim_start_Z = animations[curr_anim].Z;
+                curr_anim = (curr_anim + 1) % num_animations;
+                last_anim_switch_ticks = SDL_GetTicks();
+                /*
+                anim_start_cX = fr.cX;
+                anim_start_cY = fr.cY;
+                anim_start_Z = fr.Z;
+                */
+            }
+
+            int t0 = last_anim_switch_ticks;
+            int t1 = t0 + animations[curr_anim].ticks;
+            int t = SDL_GetTicks();
+
+            double p = (double)(t - t0) / (t1 - t0);
+            //p += ((tan((t - t0) / 1000.0) + 1) / 2) / 5;
+            /*p = 2 * p - 1;
+            p = p * p * p + p;
+            p = (p + 2) / 4;*/
+            //p = 4 * (2 * p - 1);
+            //p = erf(p / 2.0 + 1);
+            //p = (p - erf(1)) / (erf(1.5) - erf(1));
+            if (p <= 1.0) {
+
+              fr.cX = (1 - p) * (anim_start_cX) + (p * animations[curr_anim].cX);
+              fr.cY = (1 - p) * (anim_start_cY) + (p * animations[curr_anim].cY);
+              fr.Z = exp(log(anim_start_Z) * (1 - p) + p * log(animations[curr_anim].Z));
+              window_refresh();
+            }
+        }
+
         //do_update = false;
     }
 
@@ -776,5 +869,3 @@ void fractalexplorer_render(int * argc, char ** argv) {
 
     MPI_Abort(MPI_COMM_WORLD, 0);
 }
-
-

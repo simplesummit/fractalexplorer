@@ -96,7 +96,7 @@ fr_t fr;
 fr_col_t col;
 MPI_Datatype mpi_fr_t;
 
-
+char * fractal_path_file;
 
 int world_size, world_rank;
 #define IS_HEAD (world_rank == 0)

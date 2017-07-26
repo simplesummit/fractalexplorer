@@ -342,7 +342,7 @@ int grid_from_block(int a, int b) {
 void calc_cuda(fr_t fr, fr_col_t col, int tid, int threads, unsigned char * output) {
     calc_cuda_init(fr, col);
 
-    dim3 dimBlock(16, 16);
+    dim3 dimBlock(16, 12);
     dim3 dimGrid(grid_from_block(fr.w,  dimBlock.x), 
                  grid_from_block(fr.h / threads, dimBlock.y));
 
