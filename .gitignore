@@ -43,7 +43,6 @@ ltmain.sh
 *.anim
 *.mp4
 *.gif
-*.png
 *.bmp
 *.a
 *.la
