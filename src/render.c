@@ -56,7 +56,7 @@ int sdl_hndl_res;
 // the font size for SDL rendering. Eventually (possibly) this should be
 // relative to window size
 #define MIN(a, b) ((a) > (b) ? (a) : (b) )
-#define FONT_SIZE           (MIN(14, fr.h/24))
+#define FONT_SIZE           (MIN(12, fr.h/34))
 
 // graph width and height (bottom right)
 #define GRAPH_W (10 * (FONT_SIZE))
@@ -106,14 +106,18 @@ SDL_Event cevent;
 SDL_Joystick *joystick = NULL;
 
 // timeout to demo
-int timeout = 8;
+int timeout = 10;
 
 // current animation
 int curr_anim = 0;
 
 typedef struct anim_param_t {
+
+    int fractal_id;
+
     // parameters to pan and zoom to
     double cX, cY, Z;
+    double u, v;
 
     // the animation duration
     int ticks;
@@ -129,10 +133,16 @@ anim_param_t * animations;
 #define CONTROLLER_VERTICAL_AXIS        1
 #define CONTROLLER_ZOOM_AXIS            3
 
+// tweaks fr.u parameter
+#define CONTROLLER_U_AXIS               2
+
+
+
 // typed axis ids
 SDL_GameControllerAxis horiz = CONTROLLER_HORIZONTAL_AXIS,
                        vert = CONTROLLER_VERTICAL_AXIS,
-                       zaxis = CONTROLLER_ZOOM_AXIS;
+                       zaxis = CONTROLLER_ZOOM_AXIS,
+                       uaxis = CONTROLLER_U_AXIS;
 
 
 // pointer to SDL render structures to use
@@ -423,20 +433,20 @@ void window_refresh() {
             onscreen_message[i] = malloc(MAX_ONSCREEN_MESSAGE);
             sprintf(onscreen_message[i], "%s", "");
         }
-
         sprintf(onscreen_message[0], "%s", fractal_types_names[fractal_types_idx]);
         sprintf(onscreen_message[1], "fps: %.2lf", 1.0 / (tp_gp.elapsed_s + tp_draw.elapsed_s));
         sprintf(onscreen_message[2], "re(center): %+.14lf", fr.cX);
         sprintf(onscreen_message[3], "im(center): %+.14lf", fr.cY);
-        sprintf(onscreen_message[4], "zoom: %.2e", fr.Z);
-        sprintf(onscreen_message[5], "iter: %d", fr.max_iter);
-        sprintf(onscreen_message[6], "workers: %d", fr.num_workers);
+        sprintf(onscreen_message[4], "re(q) %+.14lf", fr.u);
+        sprintf(onscreen_message[5], "im(q) %+.14lf", fr.v);
+        sprintf(onscreen_message[6], "zoom: %.2e", fr.Z);
+        sprintf(onscreen_message[7], "iter: %d", fr.max_iter);
         switch (fr.engine) {
             case FR_E_C:
-                sprintf(onscreen_message[7], "engine: c");
+                sprintf(onscreen_message[8], "engine: c, workers: %d", fr.num_workers);
                 break;
             case FR_E_CUDA:
-                sprintf(onscreen_message[7], "engine: cuda");
+                sprintf(onscreen_message[8], "engine: cuda, workers: %d", fr.num_workers);
                 break;
             default:
                 break;
@@ -573,14 +583,19 @@ void fractalexplorer_render(int * argc, char ** argv) {
         #define FSF_CHK(n) if (fsf_res != n) { log_warn("parsing file failed, not using animations"); num_animations = 0; }
         log_debug("using path file: %s", fractal_path_file);
         int fsf_res = 0;
-        fsf_res = fscanf(path_fp, "%d\n", &num_animations);
-        FSF_CHK(1);
-        int k;
+        anim_param_t ta;
+        int k = 0;
+        while (7 == (fsf_res = fscanf(path_fp, "%d,%lf,%lf,%lf,%lf,%lf,%d\n", &ta.fractal_id, &ta.cX, &ta.cY, &ta.Z, &ta.u, &ta.v, &ta.ticks))) {
+               k++;
+        }
+        fclose(path_fp);
+        path_fp = fopen(fractal_path_file, "r");
+        num_animations = k;
+        log_info("using %d animations", num_animations);
         animations = malloc(sizeof (anim_param_t) * num_animations);
         for (k=0;k<num_animations;k++) {
-          fsf_res = fscanf(path_fp, "%lf,%lf,%lf,%d\n", &animations[k].cX, &animations[k].cY, &animations[k].Z, &animations[k].ticks);
-          FSF_CHK(4);
-          log_debug("Animation point %d: %lf,%lf,%lf,%d\n", k, animations[k].cX, animations[k].cY, animations[k].Z, animations[k].ticks);
+          fsf_res = fscanf(path_fp, "%d,%lf,%lf,%lf,%lf,%lf,%d\n", &animations[k].fractal_id, &animations[k].cX, &animations[k].cY, &animations[k].Z, &animations[k].u, &animations[k].v, &animations[k].ticks);
+          log_debug("Animation point %d: %d,%lf,%lf,%lf,%lf,%lf,%d\n", k, animations[k].fractal_id, animations[k].cX, animations[k].cY, animations[k].Z, animations[k].u, animations[k].v, animations[k].ticks);
         }
         fclose(path_fp);
     }
@@ -607,9 +622,15 @@ void fractalexplorer_render(int * argc, char ** argv) {
     bool reset_fr = false;
     bool update_anim = true;
 
+    int num_areas = 2;
+    char *area_names[] = { "Elephant Valley", "Tail End" };
+    int area_num = -1, last_area_num = -1;
+ 
+    char * notification_cmd = malloc(1000);
+ 
     bool r_down = false, l_down = false;
     bool s_down = false;
-    double horiz_v = 0, vert_v = 0, zoom_v = 0;
+    double horiz_v = 0, vert_v = 0, zoom_v = 0, utweak_v = 0;
 
     int last_ticks = SDL_GetTicks();
     int last_update_ticks = SDL_GetTicks();
@@ -618,6 +639,7 @@ void fractalexplorer_render(int * argc, char ** argv) {
     double anim_start_cX = fr.cX;
     double anim_start_cY = fr.cY;
     double anim_start_Z = fr.Z;
+    double anim_start_u = fr.u, anim_start_v = fr.v;
     bool is_anim = false;
     while (keep_going == true) {
         //log_trace("outer loop");
@@ -627,12 +649,13 @@ void fractalexplorer_render(int * argc, char ** argv) {
         reset_fr = false;
         inner_keep_going = true;
         if (USE_JOYSTICK) {
-            update = horiz_v != 0 || vert_v != 0 || zoom_v != 0;
+            update = horiz_v != 0 || vert_v != 0 || zoom_v != 0 || utweak_v != 0;
             if (update) {
                 update_anim = true;
                 double scale_allinput = (double)(SDL_GetTicks() - last_ticks) / 1000.0;
-                fr.cX += 1.0 * scale_allinput * horiz_v / (fr.Z);
-                fr.cY -= 1.0 * scale_allinput * vert_v / (fr.Z);
+                fr.cX += 1.0 * scale_allinput * horiz_v / fr.Z;
+                fr.cY -= 1.0 * scale_allinput * vert_v / fr.Z;
+                fr.u += 1.0 * scale_allinput * utweak_v / fr.Z;
                 double zfact = 1.0 + 1.0 * scale_allinput * abs(zoom_v);
                 if (zoom_v > 0) {
                     fr.Z /= zfact;
@@ -646,6 +669,7 @@ void fractalexplorer_render(int * argc, char ** argv) {
             }
             */
         }
+
         last_ticks = SDL_GetTicks();
 
         while (SDL_PollEvent(&cevent)) {
@@ -663,6 +687,10 @@ void fractalexplorer_render(int * argc, char ** argv) {
                         }
                         if (cevent.jaxis.axis == zaxis) {
                             zoom_v = SMASH(cevent.jaxis.value, 100) / AXIS_MAX;
+                            //zoom_v = sgn(zoom_v) * pow(fabs(zoom_v), .333);
+                        }
+                        if (cevent.jaxis.axis == uaxis) {
+                            utweak_v = SMASH(cevent.jaxis.value, 100) / AXIS_MAX;
                             //zoom_v = sgn(zoom_v) * pow(fabs(zoom_v), .333);
                         }
                         break;
@@ -721,7 +749,7 @@ void fractalexplorer_render(int * argc, char ** argv) {
                             inner_keep_going = false;
                             log_info("escaping program");
                             MPI_Abort(MPI_COMM_WORLD, 0);
-                        } else if (cevent.key.keysym.sym == 'p' && cevent.key.repeat == 0) {
+                        } else if (cevent.key.keysym.sym == 'p') {
                             fr.max_iter += 1;
                             update = true;// update_anim = true;
                         } else if (cevent.key.keysym.sym == 'z' && cevent.key.repeat == 0) {
@@ -736,11 +764,25 @@ void fractalexplorer_render(int * argc, char ** argv) {
                             // toggle im() binary decomposition
                             fr.fractal_flags ^= FRF_BINARYDECOMP_IMAG;
                             update = true;
-                        } else if (cevent.key.keysym.sym == 'o' && cevent.key.repeat == 0) {
+                        } else if (cevent.key.keysym.sym == 'o') {
                             if (fr.max_iter > 0) {
                                 fr.max_iter -= 1;
                                 update = true;
                             }
+                        } else if (cevent.key.keysym.sym == 'a' && cevent.key.repeat == 0) {
+                            if (fr.engine == FR_E_C) {
+			        fr.engine = FR_E_CUDA;
+                            } else if (fr.engine == FR_E_CUDA) {
+                                fr.engine = FR_E_C;
+                            }
+                            update = true;
+                        } else if (cevent.key.keysym.sym == 's' && cevent.key.repeat == 0) {
+                            if (fr.engine == FR_E_C) {
+			        fr.engine = FR_E_CUDA;
+                            } else if (fr.engine == FR_E_CUDA) {
+                                fr.engine = FR_E_C;
+                            }
+                            update = true;
                         } else if (cevent.key.keysym.sym == 'k' && cevent.key.repeat == 0) {
                             if (fr.num_workers < compute_size) {
 			        fr.num_workers++;
@@ -811,6 +853,7 @@ void fractalexplorer_render(int * argc, char ** argv) {
             if (reset_fr) {
                 log_trace("resetting fractal");
                 fr.cX = 0; fr.cY = 0;
+                fr.u = 1; fr.v = 0;
                 fr.Z = .4;
             }
             //is_anim = false;
@@ -829,14 +872,22 @@ void fractalexplorer_render(int * argc, char ** argv) {
               log_debug("starting auto-animation");
               curr_anim = 0;
               last_anim_switch_ticks = SDL_GetTicks();
+              fractal_types_idx = animations[0].fractal_id;
+              fr.fractal_type = fractal_types[0];
               anim_start_cX = fr.cX;
               anim_start_cY = fr.cY;
+              anim_start_u = fr.u;
+              anim_start_v = fr.v;
               anim_start_Z = fr.Z;
             }
             is_anim = true;
             if (SDL_GetTicks() - last_anim_switch_ticks > animations[curr_anim].ticks) {
+                fractal_types_idx = animations[curr_anim].fractal_id;
+                fr.fractal_type = fractal_types[fractal_types_idx];
                 anim_start_cX = animations[curr_anim].cX;
                 anim_start_cY = animations[curr_anim].cY;
+                anim_start_u = animations[curr_anim].u;
+                anim_start_v = animations[curr_anim].v;
                 anim_start_Z = animations[curr_anim].Z;
                 curr_anim = (curr_anim + 1) % num_animations;
                 last_anim_switch_ticks = SDL_GetTicks();
@@ -863,11 +914,32 @@ void fractalexplorer_render(int * argc, char ** argv) {
 
               fr.cX = (1 - p) * (anim_start_cX) + (p * animations[curr_anim].cX);
               fr.cY = (1 - p) * (anim_start_cY) + (p * animations[curr_anim].cY);
+              fr.u = (1 - p) * (anim_start_u) + (p * animations[curr_anim].u);
+              fr.v = (1 - p) * (anim_start_v) + (p * animations[curr_anim].v);
               fr.Z = exp(log(anim_start_Z) * (1 - p) + p * log(animations[curr_anim].Z));
             }
             window_refresh();
         }
-
+#define PT_FITS(x, xr, y, yr, minz, maxz) (fabs(fr.cX - (x)) <= (xr) && fabs(fr.cY - (y)) <= (yr) && (fr.Z >= (minz) && fr.Z <= (maxz)))
+        if (PT_FITS(.35, .1, 0, .4, 5, 10000000)) {
+            area_num = 0;
+        } else if (PT_FITS(-1.7, .3, 0, .2, 10, 100000000000)) {
+            area_num = 1;
+        } else if (PT_FITS(-0.75, .3, 0, .2, 10, 100000000000)) {
+            area_num = 1;
+        } else { 
+            area_num = -1;
+        }
+        if (fractal_types_idx == 0 && area_num != last_area_num) {
+            if (area_num >= 0 && area_num < num_areas) {
+                sprintf(notification_cmd, "notify-send -t 3000 'fractalexplorer' 'Entering area: %s'", area_names[area_num]);
+                log_info("running cmd: '%s', code: %d", notification_cmd, system(notification_cmd));
+            } else if (last_area_num >= 0 && last_area_num < num_areas) {
+                sprintf(notification_cmd, "notify-send -t 3000 'fractalexplorer' 'Leaving area: %s'", area_names[last_area_num]);
+                log_info("running cmd: '%s', code: %d", notification_cmd, system(notification_cmd));
+            }
+        }
+        last_area_num = area_num;
         //do_update = false;
     }
 

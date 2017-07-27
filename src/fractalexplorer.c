@@ -39,15 +39,16 @@ int processor_name_len;
 
 int fractal_types_idx = 0;
 int fractal_types[FR_FRACTAL_NUM] = {
-    FR_MANDELBROT, FR_MANDELBROT_3, FR_EXP, FR_SIN
+    FR_MANDELBROT, FR_MANDELBROT_3, FR_EXP, FR_SIN, FR_JULIA
 
 };
 
 char * fractal_types_names[FR_FRACTAL_NUM] = {
-    "Mandelbrot: z^2+c",
-    "Multibrot: z^3+c",
+    "Mandelbrot: z^2 + c",
+    "Multibrot: z^3 + c",
     "exp(z) + c",
-    "sin(z) + c"
+    "sin(z) + c",
+    "Julia: z^2 + q"
 };
 
 int * gargc;
@@ -200,7 +201,7 @@ int main(int argc, char ** argv) {
     fr.fractal_type = FR_MANDELBROT;
 
     // see fr.h for more  flags
-    fr.fractal_flags = FRF_NONE;// | FRF_SIMPLE | FRF_BINARYDECOMP_IMAG;// | FRF_BINARYDECOMP_IMAG;// | FRF_BINARYDECOMP_REAL;// | FRF_ADD_PERIOD;// | FRF_SIMPLE;
+    fr.fractal_flags = FRF_NONE | FRF_SIMPLE;// | FRF_BINARYDECOMP_IMAG;// | FRF_BINARYDECOMP_IMAG;// | FRF_BINARYDECOMP_REAL;// | FRF_ADD_PERIOD;// | FRF_SIMPLE;
 
     col.num = 120;
 

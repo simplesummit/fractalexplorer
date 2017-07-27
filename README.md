@@ -68,7 +68,10 @@ TODO: Add multi-machine example
 
 Keyboard arrows pan, space zooms in, and shift+space zooms out.
 
+
 `p` increases iteration, `o` decreases
+
+`a` and `s` change the engine (c or CUDA)
 
 `k` increases number of nodes working on image, `j` decreases
 

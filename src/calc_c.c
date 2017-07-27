@@ -103,15 +103,15 @@ void calc_c(fr_t fr, int tid, int threads, unsigned char * output) {
 
     double _t0, _t1, _t2, _t3, _t4, _t5, _t6;
 
-    // complex numbers representing the current iteration, and the starting
-    // value for a pixel
-    double complex z, c;
+    // complex numbers representing the current iteration, the starting
+    // value for a pixel, and the value of u + i * v
+    double complex z, c, q = fr.u + I * fr.v;
 
     // set this so that we have uniform distances between pixels
     dppx = 2.0 / (fr.w * fr.Z);
 
     // start compute loop
-    log_trace("mand_c running center (%lf,%lf), zoom %lf, dim (%d,%d), threads: %d, stripe: %d",
+    log_debug("mand_c running center (%.20lf,%.20lf), zoom %lf, dim (%d,%d), threads: %d, stripe: %d",
               fr.cX, fr.cY,
               fr.Z,
               fr.w, fr.h,
@@ -176,7 +176,7 @@ void calc_c(fr_t fr, int tid, int threads, unsigned char * output) {
                         // however, this leads to some visual artifacts and
                         // should be kept >= 4.0, with 16.0 further reducing
                         // visual imperfections
-                        for (ci = 0; ci < fr.max_iter && _t4 + _t5 <= 16.0; ++ci) {
+                        for (ci = 0; ci < fr.max_iter && _t4 + _t5 <= 256.0; ++ci) {
                             // this is the standard function, z = z ** 2 + c
                             //z = z * z + c;
 
@@ -249,6 +249,13 @@ void calc_c(fr_t fr, int tid, int threads, unsigned char * output) {
                     // just send a fractional iteration of the actual integer
                     // value
                     fri = 0.0 + ci;
+                    break;
+                case FR_JULIA:
+                    // essentially the same as z^2+c, just add q instead of c
+                    for (ci = 0; ci < fr.max_iter && cabs(z) < 16.0; ++ci) {
+                        z = z * z + q;
+                    }
+                    fri = 2.0 + ci - log(log(cabs2(z))) / log(2.0);
                     break;
                 default:
                     // this should never happen

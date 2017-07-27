@@ -191,7 +191,7 @@ void cuda_kernel(fr_t fr, int tid, int threads, unsigned char * col, int ncol, u
     double c_r, c_i, _t0, _t1, _t2, _t3;
 
     // real, imaginary
-    cuDoubleComplex z, c;
+    cuDoubleComplex z, c, q;
     
     c_r = fr.cX - (fr.w - 2 * px) / (fr.Z * fr.w);
     c_i = fr.cY + (fr.h - 2 * py) / (fr.Z * fr.w);
@@ -199,6 +199,9 @@ void cuda_kernel(fr_t fr, int tid, int threads, unsigned char * col, int ncol, u
     c = ccreate(c_r, c_i);
 
     z = c;
+
+    // u + i*v
+    q = ccreate(fr.u, fr.v);
 
     switch (fr.fractal_type) {
         case FR_MANDELBROT:
@@ -267,6 +270,18 @@ void cuda_kernel(fr_t fr, int tid, int threads, unsigned char * col, int ncol, u
             // just send a fractional iteration of the actual integer
             // value
             fri = 0.0 + ci;
+            break;
+        case FR_JULIA:
+            // z**2 + q
+            for (ci = 0; ci < fr.max_iter && cabs(z) < 16.0; ++ci) {
+                z = cuCsqr(z);
+                z = cuCadd(z, q);
+
+            }
+            // no current way to easily do a fractional iteration, so
+            // just send a fractional iteration of the actual integer
+            // value
+            fri = 2.0 + ci - log(log(cabs2(z))) / log(2.0);
             break;
         default:
             // this should never happen
@@ -347,7 +362,7 @@ void calc_cuda(fr_t fr, fr_col_t col, int tid, int threads, unsigned char * outp
                  grid_from_block(fr.h / threads, dimBlock.y));
 
 
-    log_debug("cuda kernel launched at center: %f%+f, zoom: %lf, iter: %d with grid: (%d,%d), block (%d,%d)", fr.cX, fr.cY, fr.Z, fr.max_iter, dimGrid.x, dimGrid.y, dimBlock.x, dimBlock.y);
+    log_debug("cuda kernel launched at center: %.20lf,%.20lf, zoom: %lf, iter: %d with grid: (%d,%d), block (%d,%d)", fr.cX, fr.cY, fr.Z, fr.max_iter, dimGrid.x, dimGrid.y, dimBlock.x, dimBlock.y);
 
     // we dont need cudaMalloc(), because of ZEROcopy buffers that the GPU and CPU can share sys memory
     cuda_kernel<<<dimGrid, dimBlock>>>(fr, tid, threads, _gpu_col, colnum, _gpu_output, _gpu_err);

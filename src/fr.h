@@ -46,9 +46,11 @@ can also find a copy at http://www.gnu.org/licenses/.
 // testing sin function, sin(z) + c.
 #define FR_SIN               (0x0104)
 
+// like z**2+c, but now z**2+(u+i*v), where u and v are user controlled parameters
+#define FR_JULIA             (0x0105)
 
 // how many fractal types
-#define FR_FRACTAL_NUM            4
+#define FR_FRACTAL_NUM            5
 
 
 /* fractal flags */
