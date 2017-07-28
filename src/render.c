@@ -92,6 +92,7 @@ unsigned int hash;
 
 // whether or not to draw the information
 bool show_text_info = true;
+bool show_graph = true;
 
 // the previous x and y coordinates
 double last_x, last_y;
@@ -308,6 +309,7 @@ void window_refresh() {
         // start rendering, we need to clear the render instance
         SDL_RenderClear(renderer);
         //bool scale_wholegraph = false;
+        if (show_graph) {
         double total_time = 1.0 / last_fps;
         if (isinf(total_time)) total_time = 0.03;
         double ltotal_time = 1.0 / last_last_fps;
@@ -410,9 +412,10 @@ void window_refresh() {
         //memset(graph_texture_pixels + 4 * (GRAPH_H-1) * GRAPH_W, 0, 4 * GRAPH_W);
         //graph_cpixel++;
         SDL_UpdateTexture(graph_texture, NULL, graph_texture_pixels, 4 * GRAPH_W);
+        }
         SDL_UpdateTexture(texture, NULL, pixels, 4 * fr.w);
         SDL_RenderCopy(renderer, texture, NULL, NULL);
-        SDL_RenderCopy(renderer, graph_texture, NULL, &graph_offset);
+        if (show_graph) SDL_RenderCopy(renderer, graph_texture, NULL, &graph_offset);
  //   	SDL_RenderPresent(renderer);
     )
     last_draw_fps = 1.0 / tp_draw.elapsed_s;
@@ -520,6 +523,7 @@ void fractalexplorer_render(int * argc, char ** argv) {
     // make sure to quit and shut down TTF libraries
     atexit(TTF_Quit);
 
+
     window = SDL_CreateWindow("Mandelbrot Render", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, fr.w, fr.h, 0);
     if (fr.w == 0 || fr.h == 0 || use_fullscreen) {
         SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP); // SDL_WINDOW_FULLSCREEN_DESKTOP, or SDL_WINDOW_FULLSCREEN
@@ -527,6 +531,8 @@ void fractalexplorer_render(int * argc, char ** argv) {
     // in case fullscreen changes it
     SDL_GetWindowSize(window, &fr.w, &fr.h);
 
+
+    SDL_ShowCursor(SDL_DISABLE);
 
     // try to open our default font
 
