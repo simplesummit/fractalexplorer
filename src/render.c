@@ -531,8 +531,7 @@ void fractalexplorer_render(int * argc, char ** argv) {
     // in case fullscreen changes it
     SDL_GetWindowSize(window, &fr.w, &fr.h);
 
-
-    SDL_ShowCursor(SDL_DISABLE);
+    if (!show_cursor) SDL_ShowCursor(SDL_DISABLE);
 
     // try to open our default font
 

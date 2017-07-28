@@ -57,6 +57,8 @@ char *** gargv;
 
 
 bool use_fullscreen = false;
+bool show_cursor = true;
+
 
 MPI_Datatype mpi_fr_t;
 int mpi_fr_blocklengths[mpi_fr_numitems] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
@@ -86,6 +88,7 @@ void mandelbrot_show_help() {
     printf("  -G[F]          set color index multiplyer\n");
     printf("  -P[S]          set fractal path file name\n");
     printf("  -F             use fullscreen\n");
+    printf("  -L             disable cursor\n");
     printf("  -i[N]          set iterations\n");
     printf("  -x[F]          set center x\n");
     printf("  -y[F]          set center y\n");
@@ -103,7 +106,7 @@ void mandelbrot_show_help() {
 // returns exit code, or -1 if we shouldn't exit
 int parse_args(int argc, char ** argv) {
     char c;
-    while ((c = getopt(argc, argv, "v:N:P:M:E:G:i:e:k:x:y:z:c:Fh")) != GETOPT_STOP) {
+    while ((c = getopt(argc, argv, "v:N:P:M:E:G:i:e:k:x:y:z:c:FLh")) != GETOPT_STOP) {
 	switch (c) {
         case 'h':
     		    mandelbrot_show_help();
@@ -120,6 +123,9 @@ int parse_args(int argc, char ** argv) {
             break;
         case 'F':
             use_fullscreen = true;
+            break;
+        case 'L':
+            show_cursor = false;
             break;
         case 'i':
             fr.max_iter = atoi(optarg);

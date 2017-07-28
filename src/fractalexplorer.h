@@ -38,6 +38,8 @@ can also find a copy at http://www.gnu.org/licenses/.
 #include <getopt.h>
 
 bool use_fullscreen;
+bool show_cursor;
+
 
 #include "log.h"
 
