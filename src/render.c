@@ -197,7 +197,7 @@ void gather_picture() {
     // pixels array. Thus, free() should never be called with naddr
     unsigned char * naddr;
     if (recv_nbytes == NULL) {
-        log_trace("initializing buffers for storing compressed/computed pixels");
+        log_debug("initializing buffers for storing compressed/computed pixels");
         recv_nbytes = malloc(sizeof(int *) * compute_size);
         recv_compressed_bytes = malloc(sizeof(unsigned char *) * compute_size);
         recv_bytes = malloc(sizeof(unsigned char *) * compute_size);
@@ -220,7 +220,6 @@ void gather_picture() {
     C_TIME(tp_compute,
         MPI_Bcast(&fr, 1, mpi_fr_t, 0, MPI_COMM_WORLD);
 
-
         MPI_Barrier(MPI_COMM_WORLD);
     )
 
@@ -238,6 +237,7 @@ void gather_picture() {
             MPI_Wait(&recv_requests[i], &recv_status[i]);
         }
     )
+
     C_TIME(tp_decompress,
         for (i = 0; i < fr.num_workers; ++i) {
             if (recv_nbytes[i] > 0) {
@@ -286,13 +286,10 @@ void window_refresh() {
     int i, j, ri, ri_s, ri_d;
 
     // get the window surface again, just in case something changed
-    screen = SDL_GetWindowSurface(window);
+    //screen = SDL_GetWindowSurface(window);
 
     if (pixels == NULL) {
         log_trace("malloc'ing render pixels");
-        if (pixels != NULL) {
-            //free(pixels);
-        }
         pixels = (unsigned char *)malloc(4 * fr.w * fr.h);
         memset(pixels, 0, 4 * fr.w * fr.h);
     }
@@ -415,6 +412,7 @@ void window_refresh() {
         }
         SDL_UpdateTexture(texture, NULL, pixels, 4 * fr.w);
         SDL_RenderCopy(renderer, texture, NULL, NULL);
+        
         if (show_graph) SDL_RenderCopy(renderer, graph_texture, NULL, &graph_offset);
  //   	SDL_RenderPresent(renderer);
     )
@@ -463,7 +461,7 @@ void window_refresh() {
                     tsurface = TTF_RenderText_Solid(font, onscreen_message[i], text_color);
                     if (tsurface->w > max_w) max_w = tsurface->w;
                     text_box_offset.h += tsurface->h;
-
+                    SDL_FreeSurface(tsurface);
                 }
             }
             text_box_offset.w = max_w + FONT_SIZE / 2;
@@ -477,6 +475,8 @@ void window_refresh() {
                     message_texture = SDL_CreateTextureFromSurface(renderer, tsurface);
                     SDL_RenderCopy(renderer, message_texture, NULL, &offset);
                     offset.y += tsurface->h;
+                    SDL_FreeSurface(tsurface);
+                    SDL_DestroyTexture(message_texture);
                 }
             }
         )
@@ -567,16 +567,14 @@ void fractalexplorer_render(int * argc, char ** argv) {
    // surface = SDL_CreateRGBSurface(SDL_SWSURFACE, fr.w, fr.h, 32, 0xFF, 0xFF00, 0xFF0000, 0xFF000000);
     renderer = SDL_CreateRenderer(window, -1, 0);
 
-
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 120);
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-
 
     SDL_RenderClear(renderer);
     SDL_RenderPresent(renderer);
 
-
     texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, fr.w, fr.h);
+
     graph_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, GRAPH_W, GRAPH_H);
 
     FILE * path_fp = fopen(fractal_path_file, "r");
@@ -615,7 +613,6 @@ void fractalexplorer_render(int * argc, char ** argv) {
     memset(graph_texture_pixels, 0, 4 * GRAPH_W * GRAPH_H);
 
     MPI_Bcast(&fr, 1, mpi_fr_t, 0, MPI_COMM_WORLD);
-
 
     window_refresh();
 
