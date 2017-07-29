@@ -85,7 +85,7 @@ double compress_rate = 0.0;
 tperf_t tperf_render;
 
 // an RGBA array of pixels to read in from compute nodes
-unsigned char * pixels;
+unsigned char * pixels = NULL;
 
 // a global hash, so we know whether to update the fractal
 unsigned int hash;
@@ -183,12 +183,6 @@ SDL_Color text_color = { 0, 0, 0 },
 // pointer to onscreen message strings
 char ** onscreen_message = NULL;
 
-
-// hash function to determine whether fr has changed
-unsigned int hash_fr(fr_t fr) {
-    return (int)floor( fr.Z + fr.w * (fr.h + fr.Z) - fr.cX - fr.cY + sin(fr.cX + fr.Z * fr.cY / fr.w) + fr.h);
-}
-
 // requests picture from compute nodes
 void gather_picture() {
     // pe is how much should be computed by each worker
@@ -268,9 +262,6 @@ void gather_picture() {
 
 // refreshes the whole window, recalculating if needed
 void window_refresh() {
-    if (hash == hash_fr(fr)) {
-        return;
-    }
     tperf_t tp_wr, tp_gp, tp_draw, tp_textdraw;
     SDL_Rect text_box_offset = (SDL_Rect){0, 0, 0, 0};
     offset = (SDL_Rect){0, 0, 0, 0};
@@ -427,11 +418,9 @@ void window_refresh() {
             onscreen_message = malloc(NUM_ONSCREEN_MESSAGE * sizeof(char *));
             for (i = 0; i < NUM_ONSCREEN_MESSAGE; ++i) {
                 onscreen_message[i] = malloc(MAX_ONSCREEN_MESSAGE);
-                sprintf(onscreen_message[i], "%s", "");
             }
         }
         for (i = 0; i < NUM_ONSCREEN_MESSAGE; ++i) {
-            onscreen_message[i] = malloc(MAX_ONSCREEN_MESSAGE);
             sprintf(onscreen_message[i], "%s", "");
         }
         sprintf(onscreen_message[0], "%s", fractal_types_names[fractal_types_idx]);
@@ -614,9 +603,9 @@ void fractalexplorer_render(int * argc, char ** argv) {
 
     MPI_Bcast(&fr, 1, mpi_fr_t, 0, MPI_COMM_WORLD);
 
+
     window_refresh();
 
-    pixels = NULL;
 
     bool keep_going = true;
     bool inner_keep_going = true;
@@ -842,7 +831,7 @@ void fractalexplorer_render(int * argc, char ** argv) {
                         break;
                 }
             }
-            SDL_PumpEvents();
+            //SDL_PumpEvents();
             //inner_do = false;
         }
         if (!keep_going) {
