@@ -56,11 +56,14 @@ int sdl_hndl_res;
 // the font size for SDL rendering. Eventually (possibly) this should be
 // relative to window size
 #define MIN(a, b) ((a) > (b) ? (a) : (b) )
-#define FONT_SIZE           (MIN(12, fr.h/34))
+#define FONT_SIZE (MIN(12, fr.h/34))
 
 // graph width and height (bottom right)
-#define GRAPH_W (10 * (FONT_SIZE))
-#define GRAPH_H (6 * (FONT_SIZE))
+#define GRAPH_W ((int)floor(12 * (FONT_SIZE)))
+#define GRAPH_H ((int)floor(GRAPH_W / 2.0))
+
+#define LEGEND_W GRAPH_W
+#define LEGEND_H FONT_SIZE
 
 
 // the last full-cycle FPS (what the user sees)
@@ -93,6 +96,7 @@ unsigned int hash;
 // whether or not to draw the information
 bool show_text_info = true;
 bool show_graph = true;
+bool show_extra = true;
 
 // the previous x and y coordinates
 double last_x, last_y;
@@ -156,10 +160,13 @@ TTF_Font *font;
 SDL_Surface * tsurface;
 SDL_Rect offset;
 SDL_Renderer * renderer;
-SDL_Texture *message_texture;
+SDL_Texture * message_texture;
+SDL_Texture * legend_texture;
 
 // texture memory
 unsigned char * graph_texture_pixels = NULL;
+unsigned char * legend_texture_pixels = NULL;
+
 
 // current pixel on the graph
 int graph_cpixel = 0;
@@ -268,11 +275,24 @@ void window_refresh() {
     offset.w = fr.w / 6;
     offset.h = fr.h / 6;
 
+
+    SDL_Color compute_color = { 255, 0, 0 };
+    SDL_Color transfer_color = { 0, 255, 0 };
+    SDL_Color decompress_color = { 255, 0, 255 };
+    SDL_Color draw_color = { 0, 255, 255 };
+
     SDL_Rect graph_offset = (SDL_Rect){0, 0, 0, 0};
     graph_offset.w = GRAPH_W;
     graph_offset.h = GRAPH_H;
     graph_offset.x = fr.w - graph_offset.w;
     graph_offset.y = fr.h - graph_offset.h;
+
+    SDL_Rect legend_offset = (SDL_Rect){0, 0, 0, 0};
+    legend_offset.w = LEGEND_W;
+    legend_offset.h = LEGEND_H;
+    legend_offset.x = fr.w - legend_offset.w;
+    legend_offset.y = fr.h - graph_offset.h - LEGEND_H;
+
 
     int i, j, ri, ri_s, ri_d;
 
@@ -355,37 +375,37 @@ void window_refresh() {
             for (; j >= GRAPH_H * (sfg - 1.0 / last_compute_fps) / graph_scale && j >= 0; j--) {
                 ri = 4 * (j * GRAPH_W + i);
                 // this (compute time) shows up in blue
-                graph_texture_pixels[ri + 0] = 255;
-                graph_texture_pixels[ri + 1] = 0;
-                graph_texture_pixels[ri + 2] = 0;
-                graph_texture_pixels[ri + 3] = 200;
+                graph_texture_pixels[ri + 0] = compute_color.b;
+                graph_texture_pixels[ri + 1] = compute_color.g;
+                graph_texture_pixels[ri + 2] = compute_color.r;
+                graph_texture_pixels[ri + 3] = compute_color.a;
             }
             sfg -= 1.0 / last_compute_fps;
             for (; j >= GRAPH_H * (sfg - 1.0 / last_transfer_fps) / graph_scale && j >= 0; j--) {
                 ri = 4 * (j * GRAPH_W + i);
                 // transfer time shows up in green
-                graph_texture_pixels[ri + 0] = 0;
-                graph_texture_pixels[ri + 1] = 255;
-                graph_texture_pixels[ri + 2] = 0;
-                graph_texture_pixels[ri + 3] = 200;
+                graph_texture_pixels[ri + 0] = transfer_color.b;
+                graph_texture_pixels[ri + 1] = transfer_color.g;
+                graph_texture_pixels[ri + 2] = transfer_color.r;
+                graph_texture_pixels[ri + 3] = transfer_color.a;
             }
             sfg -= 1.0 / last_transfer_fps;
             for (; j >= GRAPH_H * (sfg - 1.0 / last_decompress_fps) / graph_scale && j >= 0; j--) {
                 ri = 4 * (j * GRAPH_W + i);
                 // decompression time shows up in red
-                graph_texture_pixels[ri + 0] = 0;
-                graph_texture_pixels[ri + 1] = 0;
-                graph_texture_pixels[ri + 2] = 255;
-                graph_texture_pixels[ri + 3] = 200;
+                graph_texture_pixels[ri + 0] = decompress_color.b;
+                graph_texture_pixels[ri + 1] = decompress_color.g;
+                graph_texture_pixels[ri + 2] = decompress_color.r;
+                graph_texture_pixels[ri + 3] = decompress_color.a;
             }
             sfg -= 1.0 / last_decompress_fps;
             for (; j >= GRAPH_H * (sfg - 1.0 / last_draw_fps) / graph_scale && j >= 0; j--) {
                 ri = 4 * (j * GRAPH_W + i);
                 // draw time shows up in white
-                graph_texture_pixels[ri + 0] = 255;
-                graph_texture_pixels[ri + 1] = 255;
-                graph_texture_pixels[ri + 2] = 255;
-                graph_texture_pixels[ri + 3] = 200;
+                graph_texture_pixels[ri + 0] = draw_color.b;
+                graph_texture_pixels[ri + 1] = draw_color.g;
+                graph_texture_pixels[ri + 2] = draw_color.r;
+                graph_texture_pixels[ri + 3] = draw_color.a;
             }
             sfg -= 1.0 / last_draw_fps;
             for (; j >= 0; j--) {
@@ -394,23 +414,56 @@ void window_refresh() {
                 graph_texture_pixels[ri + 0] = 0;
                 graph_texture_pixels[ri + 1] = 0;
                 graph_texture_pixels[ri + 2] = 0;
-                graph_texture_pixels[ri + 3] = 200;
+                graph_texture_pixels[ri + 3] = 255;
             }
         }
         //memset(graph_texture_pixels + 4 * (GRAPH_H-1) * GRAPH_W, 0, 4 * GRAPH_W);
         //graph_cpixel++;
         SDL_UpdateTexture(graph_texture, NULL, graph_texture_pixels, 4 * GRAPH_W);
+
+        //SDL_RenderCopy(renderer, legend_texture, NULL, &graph_offset);
+
+
+        //memset(legend_texture_pixels, 0, 4 * LEGEND_W * LEGEND_H);
         }
+
         SDL_UpdateTexture(texture, NULL, pixels, 4 * fr.w);
         SDL_RenderCopy(renderer, texture, NULL, NULL);
-        
-        if (show_graph) SDL_RenderCopy(renderer, graph_texture, NULL, &graph_offset);
+
+        if (show_extra && show_graph) {
+           SDL_RenderCopy(renderer, graph_texture, NULL, &graph_offset);
+           graph_offset.w = LEGEND_W;
+           graph_offset.h = LEGEND_H;
+           graph_offset.x = fr.w - GRAPH_W;
+           graph_offset.y = fr.h - GRAPH_H;
+
+           memset(legend_texture_pixels, 0, 4 * LEGEND_W * LEGEND_H);
+
+           SDL_UpdateTexture(legend_texture, NULL, legend_texture_pixels, 4 * LEGEND_W);
+           SDL_RenderCopy(renderer, legend_texture, NULL, &legend_offset);
+
+           legend_offset.x += FONT_SIZE / 2;
+
+#define ADD_TO_LEGEND(str, col) tsurface = TTF_RenderText_Solid(font, str, col); \
+           message_texture = SDL_CreateTextureFromSurface(renderer, tsurface); \
+           legend_offset.w = strlen(str) * FONT_SIZE / 2; \
+           SDL_RenderCopy(renderer, message_texture, NULL, &legend_offset); \
+           legend_offset.x += legend_offset.w + FONT_SIZE / 2; \
+           SDL_FreeSurface(tsurface); \
+           SDL_DestroyTexture(message_texture);
+
+
+           ADD_TO_LEGEND("compute", compute_color);
+           ADD_TO_LEGEND("io", transfer_color);
+           ADD_TO_LEGEND("decomp", decompress_color);
+           ADD_TO_LEGEND("draw", draw_color);
+        }
  //   	SDL_RenderPresent(renderer);
     )
     last_draw_fps = 1.0 / tp_draw.elapsed_s;
 
     last_graph_scale = graph_scale;
-    if (show_text_info) {
+    if (show_extra && show_text_info) {
         log_trace("showing text info");
 
         // first time through, allocated enough messages
@@ -565,6 +618,10 @@ void fractalexplorer_render(int * argc, char ** argv) {
     texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, fr.w, fr.h);
 
     graph_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, GRAPH_W, GRAPH_H);
+    legend_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, LEGEND_W, LEGEND_H);
+
+    legend_texture_pixels = malloc(4 * LEGEND_W * LEGEND_H);
+    memset(legend_texture_pixels, 0, 4 * LEGEND_W * LEGEND_H);
 
     FILE * path_fp = fopen(fractal_path_file, "r");
 
@@ -616,9 +673,9 @@ void fractalexplorer_render(int * argc, char ** argv) {
     int num_areas = 2;
     char *area_names[] = { "Elephant Valley", "Tail End" };
     int area_num = -1, last_area_num = -1;
- 
+
     char * notification_cmd = malloc(1000);
- 
+
     bool r_down = false, l_down = false;
     bool s_down = false;
     double horiz_v = 0, vert_v = 0, zoom_v = 0, utweak_v = 0;
@@ -769,21 +826,24 @@ void fractalexplorer_render(int * argc, char ** argv) {
                             update = true;
                         } else if (cevent.key.keysym.sym == 's' && cevent.key.repeat == 0) {
                             if (fr.engine == FR_E_C) {
-			        fr.engine = FR_E_CUDA;
+			                           fr.engine = FR_E_CUDA;
                             } else if (fr.engine == FR_E_CUDA) {
                                 fr.engine = FR_E_C;
                             }
                             update = true;
                         } else if (cevent.key.keysym.sym == 'k' && cevent.key.repeat == 0) {
                             if (fr.num_workers < compute_size) {
-			        fr.num_workers++;
+			                          fr.num_workers++;
                                 update = true;
                             }
                         } else if (cevent.key.keysym.sym == 'j' && cevent.key.repeat == 0) {
                             if (fr.num_workers > 1) {
-			        fr.num_workers--;
+			                          fr.num_workers--;
                                 update = true;
                             }
+                        } else if (cevent.key.keysym.sym == 't' && cevent.key.repeat == 0) {
+	                          show_extra = !show_extra;
+                            update = true;
                         } else if (cevent.key.keysym.sym == 'm' && cevent.key.repeat == 0) {
                             fractal_types_idx = (fractal_types_idx + 1) % FR_FRACTAL_NUM;
                             fr.fractal_type = fractal_types[fractal_types_idx];
@@ -855,7 +915,7 @@ void fractalexplorer_render(int * argc, char ** argv) {
                 is_anim = false;
                 window_refresh();
             }
-            
+
             //_fr_interactive_sdl_recompute(fr, fr_engine);
         }
         if ((SDL_GetTicks() - last_update_ticks) / 1000 >= timeout + 1.0 / last_fps) {
@@ -918,7 +978,7 @@ void fractalexplorer_render(int * argc, char ** argv) {
             area_num = 1;
         } else if (PT_FITS(-0.75, .3, 0, .2, 10, 100000000000)) {
             area_num = 1;
-        } else { 
+        } else {
             area_num = -1;
         }
         if (fractal_types_idx == 0 && area_num != last_area_num) {
