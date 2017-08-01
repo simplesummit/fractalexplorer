@@ -607,7 +607,7 @@ void fractalexplorer_render(int * argc, char ** argv) {
 //    screen = SDL_GetWindowSurface(window);
 
    // surface = SDL_CreateRGBSurface(SDL_SWSURFACE, fr.w, fr.h, 32, 0xFF, 0xFF00, 0xFF0000, 0xFF000000);
-    renderer = SDL_CreateRenderer(window, -1, 0);
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 120);
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
