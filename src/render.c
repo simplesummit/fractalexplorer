@@ -565,11 +565,13 @@ void fractalexplorer_render(int * argc, char ** argv) {
     // make sure to quit and shut down TTF libraries
     atexit(TTF_Quit);
 
-
-    window = SDL_CreateWindow("Mandelbrot Render", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, fr.w, fr.h, 0);
+    int window_flags = 0;
     if (fr.w == 0 || fr.h == 0 || use_fullscreen) {
-        SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP); // SDL_WINDOW_FULLSCREEN_DESKTOP, or SDL_WINDOW_FULLSCREEN
+        window_flags = window_flags | SDL_WINDOW_FULLSCREEN_DESKTOP;
     }
+
+    window = SDL_CreateWindow("Mandelbrot Render", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, fr.w, fr.h, window_flags);
+    
     // in case fullscreen changes it
     SDL_GetWindowSize(window, &fr.w, &fr.h);
 
@@ -918,7 +920,7 @@ void fractalexplorer_render(int * argc, char ** argv) {
 
             //_fr_interactive_sdl_recompute(fr, fr_engine);
         }
-        if ((SDL_GetTicks() - last_update_ticks) / 1000 >= timeout + 1.0 / last_fps) {
+        if (num_animations > 0 && (SDL_GetTicks() - last_update_ticks) / 1000 >= timeout + 1.0 / last_fps) {
             if (!is_anim) {
               log_debug("starting auto-animation");
               curr_anim = 0;
