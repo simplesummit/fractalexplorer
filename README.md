@@ -20,6 +20,24 @@ Optionally, the following are supported:
  * CUDA (use --with-cuda to specify)
 
 
+## On leconte
+
+This is for setting up the project on a physical build of leconte.
+
+First, you will need to set up [our ansible configuration](https://github.com/ornl-leconte/ansible-management) on the cluster.
+
+Either download a release tarball, or clone the development branch. (you can do this anywhere on the filesystem).
+
+Now, run `./configure --prefix=/leconte/shared` assure this runs with no errors.
+
+Run `make` and assure there are no errors during compilation, then run `make install`
+
+This should install binaries to the correct places that our ansible-installed scripts are looking for.
+
+Now, to test, run `/leconte/startup.sh` you should have a fullscreen application running in about 5-6 seconds max.
+
+
+
 ## Building
 
 ### From Release Tarball
@@ -44,6 +62,8 @@ Now, you can run `./configure && make` just like **From Release Tarball**.
 ## Installing
 
 Install scripts for required software are provided for macOS and ubuntu, they should be ran like: `./install_macos.sh` or `./install_ubuntu.sh` respectively.
+
+
 
 
 ## Running
