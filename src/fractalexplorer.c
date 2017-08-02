@@ -74,7 +74,7 @@ fr_col_t col;
 
 #define GETOPT_STOP ((char)-1)
 
-char * csch = "green";
+char * csch = "random";
 
 char * fractal_path_file = "default.frpath";
 
@@ -198,7 +198,7 @@ int main(int argc, char ** argv) {
     fr.v = 0.0;
     fr.coffset = 0;
     fr.cscale = 1.0;
-    fr.max_iter = 100;
+    fr.max_iter = 250;
     fr.w = 640;
     fr.h = 480;
     fr.engine = FR_E_C;

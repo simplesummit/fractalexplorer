@@ -56,7 +56,7 @@ int sdl_hndl_res;
 // the font size for SDL rendering. Eventually (possibly) this should be
 // relative to window size
 #define MIN(a, b) ((a) > (b) ? (a) : (b) )
-#define FONT_SIZE (MIN(12, fr.h/34))
+#define FONT_SIZE (MIN(10, fr.h/34))
 
 // graph width and height (bottom right)
 #define GRAPH_W ((int)floor(12 * (FONT_SIZE)))
@@ -136,18 +136,36 @@ anim_param_t * animations;
 // these were found for the Logitech DualAction
 #define CONTROLLER_HORIZONTAL_AXIS      0
 #define CONTROLLER_VERTICAL_AXIS        1
-#define CONTROLLER_ZOOM_AXIS            3
+#define CONTROLLER_ZOOM_POS_AXIS        4
+#define CONTROLLER_ZOOM_NEG_AXIS        5
 
 // tweaks fr.u parameter
 #define CONTROLLER_U_AXIS               2
+#define CONTROLLER_V_AXIS               3
+
+
+#define CONTROLLER_FRF_SIMPLE_BUTTON    2
+#define CONTROLLER_FRF_DREAL_BUTTON     1
+#define CONTROLLER_FRF_DIMAG_BUTTON     3
+#define CONTROLLER_THEATRIC_BUTTON      0
+
+#define CONTROLLER_START_BUTTON         7
+#define CONTROLLER_SELECT_BUTTON        6
+
+#define CONTROLLER_LEFT_BUMPER          4
+#define CONTROLLER_RIGHT_BUMPER         5
 
 
 
 // typed axis ids
 SDL_GameControllerAxis horiz = CONTROLLER_HORIZONTAL_AXIS,
                        vert = CONTROLLER_VERTICAL_AXIS,
-                       zaxis = CONTROLLER_ZOOM_AXIS,
+                       zpaxis = CONTROLLER_ZOOM_POS_AXIS,
+                       znaxis = CONTROLLER_ZOOM_NEG_AXIS,
+                       vaxis = CONTROLLER_V_AXIS,
                        uaxis = CONTROLLER_U_AXIS;
+
+
 
 
 // pointer to SDL render structures to use
@@ -584,10 +602,10 @@ void fractalexplorer_render(int * argc, char ** argv) {
     if (SDL_NumJoysticks() > 0) {
         //controller = SDL_GameControllerOpen(0);
         joystick = SDL_JoystickOpen(0);
-        log_debug("Controller name: %s\n", SDL_JoystickName(joystick));
         if (joystick == NULL) {
             log_error("opening joystick 0 failed: %s", SDL_GetError());
         }
+        log_debug("Controller name: %s, number of buttons: %d\n", SDL_JoystickName(joystick), SDL_JoystickNumButtons(joystick));
     }
 
     if (USE_JOYSTICK) {
@@ -680,7 +698,9 @@ void fractalexplorer_render(int * argc, char ** argv) {
 
     bool r_down = false, l_down = false;
     bool s_down = false;
-    double horiz_v = 0, vert_v = 0, zoom_v = 0, utweak_v = 0;
+    double horiz_v = 0, vert_v = 0, zoom_v = 0, utweak_v = 0, vtweak_v = 0;
+
+    double zoomfact;
 
     int last_ticks = SDL_GetTicks();
     int last_update_ticks = SDL_GetTicks();
@@ -699,19 +719,22 @@ void fractalexplorer_render(int * argc, char ** argv) {
         reset_fr = false;
         inner_keep_going = true;
         if (USE_JOYSTICK) {
-            update = horiz_v != 0 || vert_v != 0 || zoom_v != 0 || utweak_v != 0;
+            update = horiz_v != 0 || vert_v != 0 || zoom_v != 0 || utweak_v != 0 || vtweak_v != 0;
             if (update) {
                 update_anim = true;
                 double scale_allinput = (double)(SDL_GetTicks() - last_ticks) / 1000.0;
                 fr.cX += 1.0 * scale_allinput * horiz_v / fr.Z;
                 fr.cY -= 1.0 * scale_allinput * vert_v / fr.Z;
                 fr.u += 1.0 * scale_allinput * utweak_v / fr.Z;
-                double zfact = 1.0 + 1.0 * scale_allinput * abs(zoom_v);
+                fr.v -= 1.0 * scale_allinput * vtweak_v / fr.Z;
+                log_info("zscale: %lf, scale: %lf", zoom_v, scale_allinput);
+                zoomfact = 1 + scale_allinput * abs(zoom_v);
                 if (zoom_v > 0) {
-                    fr.Z /= zfact;
-                } else if (zoom_v < 0) {
-                    fr.Z *= zfact;
+                    fr.Z *= zoomfact;
+                } else {
+                    fr.Z /= zoomfact;
                 }
+
             }
             /*
             if (update) {
@@ -725,23 +748,89 @@ void fractalexplorer_render(int * argc, char ** argv) {
         while (SDL_PollEvent(&cevent)) {
             if (inner_keep_going) {
                 switch (cevent.type) {
+                    case SDL_JOYHATMOTION:
+                        log_trace("joyball motion");
+                        if (cevent.jhat.value & SDL_HAT_LEFT) {
+                            fractal_types_idx = (fractal_types_idx - 1 + FR_FRACTAL_NUM) % FR_FRACTAL_NUM;
+                            fr.fractal_type = fractal_types[fractal_types_idx];
+                            update = true; update_anim = true;
+                            reset_fr = true;
+                        } else if (cevent.jhat.value & SDL_HAT_RIGHT) {
+                            fractal_types_idx = (fractal_types_idx + 1) % FR_FRACTAL_NUM;
+                            fr.fractal_type = fractal_types[fractal_types_idx];
+                            update = true; update_anim = true;
+                            reset_fr = true;
+                        }
+                        break;
+                    case SDL_JOYBUTTONDOWN:
+                        log_trace("joystick button pressed: %d", cevent.jbutton.button);
+                        if (cevent.jbutton.button == CONTROLLER_FRF_SIMPLE_BUTTON) {
+                            fr.fractal_flags ^= FRF_SIMPLE;
+                            update = true;
+                        } 
+                        if (cevent.jbutton.button == CONTROLLER_FRF_DREAL_BUTTON) {
+                            fr.fractal_flags ^= FRF_BINARYDECOMP_REAL;
+                            update = true;
+                        } 
+                        if (cevent.jbutton.button == CONTROLLER_FRF_DIMAG_BUTTON) {
+                            fr.fractal_flags ^= FRF_BINARYDECOMP_IMAG;
+                            update = true;
+                        } 
+                        if (cevent.jbutton.button == CONTROLLER_THEATRIC_BUTTON) {
+                            show_extra = !show_extra;
+                            update = true;
+                        }
+
+                        // bumper 
+
+                        if (cevent.jbutton.button == CONTROLLER_LEFT_BUMPER) {
+                            if (fr.num_workers > 1) {
+			        fr.num_workers--;
+                                update = true;
+                            }
+                        } else if (cevent.jbutton.button == CONTROLLER_RIGHT_BUMPER) {
+                            if (fr.num_workers < compute_size) {
+			        fr.num_workers++;
+                                update = true;
+                            }
+                        }
+
+                       // other buttons
+
+                       if (cevent.jbutton.button == CONTROLLER_SELECT_BUTTON) {
+                            if (fr.engine == FR_E_C) {
+                                #ifdef HAVE_CUDA
+			        fr.engine = FR_E_CUDA;
+                                #endif
+                            } else if (fr.engine == FR_E_CUDA) {
+                                fr.engine = FR_E_C;
+                            }
+
+                       }
+
+                        break;
                     case SDL_JOYAXISMOTION:
-                        log_trace("joystick axis");
+                        log_trace("joystick axis: %d", cevent.jaxis.axis);
                         if (cevent.jaxis.axis == horiz) {
-                            horiz_v = SMASH(cevent.jaxis.value, 100) / AXIS_MAX;
-                            //horiz_v = sgn(horiz_v) * pow(fabs(horiz_v), .333);
+                            horiz_v = SMASH(cevent.jaxis.value, 1000) / AXIS_MAX;
                         }
                         if (cevent.jaxis.axis == vert) {
-                            vert_v = SMASH(cevent.jaxis.value, 100) / AXIS_MAX;
-                            //vert_v = sgn(vert_v) * pow(fabs(vert_v), .333);
+                            vert_v = SMASH(cevent.jaxis.value, 1000) / AXIS_MAX;
                         }
-                        if (cevent.jaxis.axis == zaxis) {
-                            zoom_v = SMASH(cevent.jaxis.value, 100) / AXIS_MAX;
-                            //zoom_v = sgn(zoom_v) * pow(fabs(zoom_v), .333);
+                        if (cevent.jaxis.axis == zpaxis) {
+                            if (cevent.jaxis.value / AXIS_MAX > -.94) zoom_v = 1.25 * (1 + cevent.jaxis.value / AXIS_MAX);
+                            else zoom_v = 0;
+
                         }
+                        if (cevent.jaxis.axis == znaxis && cevent.jaxis.value / AXIS_MAX > -.94) {
+                            if (cevent.jaxis.value / AXIS_MAX > -.94) zoom_v = -1.25 * (1 + cevent.jaxis.value / AXIS_MAX);
+                            else zoom_v = 0;
+                        } 
                         if (cevent.jaxis.axis == uaxis) {
-                            utweak_v = SMASH(cevent.jaxis.value, 100) / AXIS_MAX;
-                            //zoom_v = sgn(zoom_v) * pow(fabs(zoom_v), .333);
+                            utweak_v = SMASH(cevent.jaxis.value, 1000) / AXIS_MAX;
+                        }
+                        if (cevent.jaxis.axis == vaxis) {
+                            vtweak_v = SMASH(cevent.jaxis.value, 1000) / AXIS_MAX;
                         }
                         break;
                     case SDL_JOYDEVICEREMOVED:
@@ -821,7 +910,9 @@ void fractalexplorer_render(int * argc, char ** argv) {
                             }
                         } else if (cevent.key.keysym.sym == 'a' && cevent.key.repeat == 0) {
                             if (fr.engine == FR_E_C) {
+                                #ifdef HAVE_CUDA
 			        fr.engine = FR_E_CUDA;
+                                #endif
                             } else if (fr.engine == FR_E_CUDA) {
                                 fr.engine = FR_E_C;
                             }
