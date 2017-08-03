@@ -192,14 +192,14 @@ int main(int argc, char ** argv) {
 
     int res = -100, loglvl;
 
-    fr.cX = -0.5;
+    fr.cX = 0;
     fr.cY = 0.0;
-    fr.Z = 0.4;
+    fr.Z = 0.5;
     fr.u = 0.0;
     fr.v = 0.0;
     fr.coffset = 0;
     fr.cscale = 1.0;
-    fr.max_iter = 250;
+    fr.max_iter = 100;
     fr.w = 640;
     fr.h = 480;
     fr.engine = FR_E_C;
