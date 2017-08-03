@@ -257,6 +257,13 @@ void calc_c(fr_t fr, int tid, int threads, unsigned char * output) {
                     }
                     fri = 2.0 + ci - log(log(cabs2(z))) / log(2.0);
                     break;
+                case FR_MULTIBROT:
+                    // essentially the same as z^2+c, just add q instead of c
+                    for (ci = 0; ci < fr.max_iter && cabs(z) < 16.0; ++ci) {
+                        z = cpow(z, q) + c;
+                    }
+                    fri = 2.0 + ci - log(log(cabs2(z))) / log(cabs(q));
+                    break;
                 default:
                     // this should never happen
                     log_error("unknown fractal type");

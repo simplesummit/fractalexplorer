@@ -39,16 +39,17 @@ int processor_name_len;
 
 int fractal_types_idx = 0;
 int fractal_types[FR_FRACTAL_NUM] = {
-    FR_MANDELBROT, FR_MANDELBROT_3, FR_EXP, FR_SIN, FR_JULIA
+    FR_MANDELBROT, FR_MANDELBROT_3, FR_EXP, FR_SIN, FR_JULIA, FR_MULTIBROT
 
 };
 
 char * fractal_types_names[FR_FRACTAL_NUM] = {
     "Mandelbrot: z^2 + c",
-    "Multibrot: z^3 + c",
+    "Multibrot[3]: z^3 + c",
     "exp(z) + c",
     "sin(z) + c",
-    "Julia: z^2 + q"
+    "Julia: z^2 + q",
+    "Multibrot: z^q + c"
 };
 
 int * gargc;

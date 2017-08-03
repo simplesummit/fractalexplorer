@@ -49,8 +49,12 @@ can also find a copy at http://www.gnu.org/licenses/.
 // like z**2+c, but now z**2+(u+i*v), where u and v are user controlled parameters
 #define FR_JULIA             (0x0105)
 
+// z**q + c, so similar to mandelbrot and julia
+#define FR_MULTIBROT         (0x0106)
+
+
 // how many fractal types
-#define FR_FRACTAL_NUM            5
+#define FR_FRACTAL_NUM            6
 
 
 /* fractal flags */

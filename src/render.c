@@ -123,6 +123,7 @@ typedef struct anim_param_t {
     // parameters to pan and zoom to
     double cX, cY, Z;
     double u, v;
+    int iter;
 
     // the animation duration
     int ticks;
@@ -654,7 +655,7 @@ void fractalexplorer_render(int * argc, char ** argv) {
         int fsf_res = 0;
         anim_param_t ta;
         int k = 0;
-        while (7 == (fsf_res = fscanf(path_fp, "%d,%lf,%lf,%lf,%lf,%lf,%d\n", &ta.fractal_id, &ta.cX, &ta.cY, &ta.Z, &ta.u, &ta.v, &ta.ticks))) {
+        while (8 == (fsf_res = fscanf(path_fp, "%d,%lf,%lf,%lf,%lf,%lf,%d,%d\n", &ta.fractal_id, &ta.cX, &ta.cY, &ta.Z, &ta.u, &ta.v, &ta.iter, &ta.ticks))) {
                k++;
         }
         fclose(path_fp);
@@ -663,8 +664,8 @@ void fractalexplorer_render(int * argc, char ** argv) {
         log_info("using %d animations", num_animations);
         animations = malloc(sizeof (anim_param_t) * num_animations);
         for (k=0;k<num_animations;k++) {
-          fsf_res = fscanf(path_fp, "%d,%lf,%lf,%lf,%lf,%lf,%d\n", &animations[k].fractal_id, &animations[k].cX, &animations[k].cY, &animations[k].Z, &animations[k].u, &animations[k].v, &animations[k].ticks);
-          log_debug("Animation point %d: %d,%lf,%lf,%lf,%lf,%lf,%d\n", k, animations[k].fractal_id, animations[k].cX, animations[k].cY, animations[k].Z, animations[k].u, animations[k].v, animations[k].ticks);
+          fsf_res = fscanf(path_fp, "%d,%lf,%lf,%lf,%lf,%lf,%d,%d\n", &animations[k].fractal_id, &animations[k].cX, &animations[k].cY, &animations[k].Z, &animations[k].u, &animations[k].v, &animations[k].iter, &animations[k].ticks);
+          log_debug("Animation point %d: %d,%lf,%lf,%lf,%lf,%lf,%d,%d\n", k, animations[k].fractal_id, animations[k].cX, animations[k].cY, animations[k].Z, animations[k].u, animations[k].v, animations[k].iter, animations[k].ticks);
         }
         fclose(path_fp);
     }
@@ -710,6 +711,7 @@ void fractalexplorer_render(int * argc, char ** argv) {
     double anim_start_cY = fr.cY;
     double anim_start_Z = fr.Z;
     double anim_start_u = fr.u, anim_start_v = fr.v;
+    int anim_start_iter = fr.max_iter;
     bool is_anim = false;
     while (keep_going == true) {
         //log_trace("outer loop");
@@ -997,8 +999,10 @@ void fractalexplorer_render(int * argc, char ** argv) {
             if (reset_fr) {
                 log_trace("resetting fractal");
                 fr.cX = 0; fr.cY = 0;
-                fr.u = 1; fr.v = 0;
+                fr.u = 0; fr.v = 0;
                 fr.Z = .4;
+                
+                //fr.max_iter = 500;
             }
             //is_anim = false;
             log_trace("recomputing fractal");
@@ -1023,6 +1027,7 @@ void fractalexplorer_render(int * argc, char ** argv) {
               anim_start_u = fr.u;
               anim_start_v = fr.v;
               anim_start_Z = fr.Z;
+              anim_start_iter = fr.max_iter;
             }
             is_anim = true;
             if (SDL_GetTicks() - last_anim_switch_ticks > animations[curr_anim].ticks) {
@@ -1033,6 +1038,7 @@ void fractalexplorer_render(int * argc, char ** argv) {
                 anim_start_u = animations[curr_anim].u;
                 anim_start_v = animations[curr_anim].v;
                 anim_start_Z = animations[curr_anim].Z;
+                anim_start_iter = animations[curr_anim].iter;
                 curr_anim = (curr_anim + 1) % num_animations;
                 last_anim_switch_ticks = SDL_GetTicks();
                 /*
@@ -1054,12 +1060,13 @@ void fractalexplorer_render(int * argc, char ** argv) {
             //p = 4 * (2 * p - 1);
             //p = erf(p / 2.0 + 1);
             //p = (p - erf(1)) / (erf(1.5) - erf(1));
-            if (p <= 1.0) {
+            if (p >= 0.0 && p <= 1.0) {
 
               fr.cX = (1 - p) * (anim_start_cX) + (p * animations[curr_anim].cX);
               fr.cY = (1 - p) * (anim_start_cY) + (p * animations[curr_anim].cY);
               fr.u = (1 - p) * (anim_start_u) + (p * animations[curr_anim].u);
               fr.v = (1 - p) * (anim_start_v) + (p * animations[curr_anim].v);
+              fr.max_iter = (int)floor(.5 + (1 - p) * (anim_start_iter) + (p * animations[curr_anim].iter));
               fr.Z = exp(log(anim_start_Z) * (1 - p) + p * log(animations[curr_anim].Z));
             }
             window_refresh();

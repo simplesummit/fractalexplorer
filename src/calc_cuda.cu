@@ -283,6 +283,18 @@ void cuda_kernel(fr_t fr, int tid, int threads, unsigned char * col, int ncol, u
             // value
             fri = 2.0 + ci - log(log(cabs2(z))) / log(2.0);
             break;
+        case FR_MULTIBROT:
+            // z**2 + q
+            for (ci = 0; ci < fr.max_iter && cabs(z) < 16.0; ++ci) {
+                z = cuCpow(z, q);
+                z = cuCadd(z, c);
+
+            }
+            // no current way to easily do a fractional iteration, so
+            // just send a fractional iteration of the actual integer
+            // value
+            fri = 2.0 + ci - log(log(cabs2(z))) / log(cabs(q));
+            break;
         default:
             // this should never happen
             *err = 1;
