@@ -371,7 +371,7 @@ void calc_cuda(fr_t fr, fr_col_t col, int tid, int threads, unsigned char * outp
 
     dim3 dimBlock(16, 12);
     dim3 dimGrid(grid_from_block(fr.w,  dimBlock.x), 
-                 grid_from_block(fr.h / threads, dimBlock.y));
+                 grid_from_block(fr.h / threads + (tid < fr.h % threads), dimBlock.y));
 
 
     log_debug("cuda kernel launched at center: %.20lf,%.20lf, zoom: %lf, iter: %d with grid: (%d,%d), block (%d,%d)", fr.cX, fr.cY, fr.Z, fr.max_iter, dimGrid.x, dimGrid.y, dimBlock.x, dimBlock.y);
@@ -385,7 +385,7 @@ void calc_cuda(fr_t fr, fr_col_t col, int tid, int threads, unsigned char * outp
 
     int res_err = 0;
 
-    gpuErrchk(cudaMemcpy(output, _gpu_output, 4 * fr.w * (fr.h / threads), cudaMemcpyDeviceToHost));
+    gpuErrchk(cudaMemcpy(output, _gpu_output, 4 * fr.w * (fr.h / threads + (tid  < fr.h % threads)), cudaMemcpyDeviceToHost));
     gpuErrchk(cudaMemcpy(&res_err, _gpu_err, sizeof(int), cudaMemcpyDeviceToHost));
 
     if (res_err != 0) {

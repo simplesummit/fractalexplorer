@@ -378,12 +378,12 @@ void start_compute() {
 
             C_TIME(tp_compress,
                 if (do_compress) {
-                    compress_size = LZ4_compress_default((char *)compute_buffer, (char *)compress_buffer, 4 * fr.h * fr.w / fr.num_workers, max_compress_size);
+                    compress_size = LZ4_compress_default((char *)compute_buffer, (char *)compress_buffer, 4 * fr.w * (fr.h / fr.num_workers + (compute_rank < fr.h % fr.num_workers)), max_compress_size);
                     if (compress_size <= 0) {
                         log_error("error in compression function: %d", compress_size);
                     }
                 } else {
-                    compress_size = -4 * fr.h * fr.w / fr.num_workers;
+                    compress_size = -4 * fr.w * (fr.h / fr.num_workers + (compute_rank < fr.h % fr.num_workers));
                     memcpy(compress_buffer, compute_buffer, abs(compress_size));
                 }
             )

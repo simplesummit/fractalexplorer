@@ -111,7 +111,7 @@ SDL_Event cevent;
 SDL_Joystick *joystick = NULL;
 
 // timeout to demo
-int timeout = 10;
+int timeout = 50;
 
 // current animation
 int curr_anim = 0;
@@ -231,6 +231,7 @@ void gather_picture() {
     }
 
     int bytes_per_compute = 4 * fr.w * fr.h / fr.num_workers;
+    int cutoff_extra = fr.num_workers % fr.h;
 
     double total_compressed_bytes = 0;
 
@@ -261,13 +262,13 @@ void gather_picture() {
     C_TIME(tp_decompress,
         for (i = 0; i < fr.num_workers; ++i) {
             if (recv_nbytes[i] > 0) {
-                int decompress_err = LZ4_decompress_safe((char *)recv_compressed_bytes[i], (char*)recv_bytes[i], abs(recv_nbytes[i]), bytes_per_compute);
+                int decompress_err = LZ4_decompress_safe((char *)recv_compressed_bytes[i], (char*)recv_bytes[i], abs(recv_nbytes[i]), bytes_per_compute + 4 * fr.w * (i < fr.h % fr.num_workers));
                 if (decompress_err < 0) {
                     log_error("decompression error: %d", decompress_err);
                     exit(3);
                 }
             } else {
-                memcpy(recv_bytes[i], recv_compressed_bytes[i], bytes_per_compute);
+                memcpy(recv_bytes[i], recv_compressed_bytes[i], bytes_per_compute + (i - cutoff_extra < 0));
             }
 
             for (j = i; j < fr.h; j += fr.num_workers) {
@@ -1002,7 +1003,7 @@ void fractalexplorer_render(int * argc, char ** argv) {
                 fr.u = 0; fr.v = 0;
                 fr.Z = .4;
                 
-                //fr.max_iter = 500;
+                fr.max_iter = 300;
             }
             //is_anim = false;
             log_trace("recomputing fractal");
