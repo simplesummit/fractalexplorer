@@ -822,6 +822,10 @@ void fractalexplorer_render(int * argc, char ** argv) {
                             }
 
                        }
+                       if (cevent.jbutton.button == CONTROLLER_START_BUTTON) {
+                           reset_fr = true;
+
+                       }
 
                         break;
                     case SDL_JOYAXISMOTION:
@@ -1015,7 +1019,7 @@ void fractalexplorer_render(int * argc, char ** argv) {
                 fr.u = 0; fr.v = 0;
                 fr.Z = .4;
                 
-                fr.max_iter = 300;
+                fr.max_iter = 100;
             }
             //is_anim = false;
             log_trace("recomputing fractal");
