@@ -701,6 +701,7 @@ void fractalexplorer_render(int * argc, char ** argv) {
     bool r_down = false, l_down = false;
     bool s_down = false;
     double horiz_v = 0, vert_v = 0, zoom_v = 0, utweak_v = 0, vtweak_v = 0;
+    double iter_v = 0;
 
     double zoomfact;
 
@@ -722,7 +723,7 @@ void fractalexplorer_render(int * argc, char ** argv) {
         reset_fr = false;
         inner_keep_going = true;
         if (USE_JOYSTICK) {
-            update = horiz_v != 0 || vert_v != 0 || zoom_v != 0 || utweak_v != 0 || vtweak_v != 0;
+            update = horiz_v != 0 || vert_v != 0 || zoom_v != 0 || utweak_v != 0 || vtweak_v != 0 || iter_v != 0;
             if (update) {
                 update_anim = true;
                 double scale_allinput = (double)(SDL_GetTicks() - last_ticks) / 1000.0;
@@ -731,6 +732,10 @@ void fractalexplorer_render(int * argc, char ** argv) {
                 fr.u += 1.0 * scale_allinput * utweak_v / fr.Z;
                 fr.v -= 1.0 * scale_allinput * vtweak_v / fr.Z;
                 log_info("zscale: %lf, scale: %lf", zoom_v, scale_allinput);
+#define MAX(a, b) ((b) > (a) ? (b) : (a))
+                fr.max_iter += (int)floor(MAX(1, 40 * scale_allinput) * iter_v);
+                
+                if (fr.max_iter < 1) fr.max_iter = 1;
                 zoomfact = 1 + scale_allinput * abs(zoom_v);
                 if (zoom_v > 0) {
                     fr.Z *= zoomfact;
@@ -753,6 +758,13 @@ void fractalexplorer_render(int * argc, char ** argv) {
                 switch (cevent.type) {
                     case SDL_JOYHATMOTION:
                         log_trace("joyball motion");
+                        iter_v = 0;
+                        if (cevent.jhat.value & SDL_HAT_UP) {
+                            iter_v = 1; update = true;
+                        }
+                        if (cevent.jhat.value & SDL_HAT_DOWN && fr.max_iter > 1) {
+                            iter_v = -1; update = true;
+                        }
                         if (cevent.jhat.value & SDL_HAT_LEFT) {
                             fractal_types_idx = (fractal_types_idx - 1 + FR_FRACTAL_NUM) % FR_FRACTAL_NUM;
                             fr.fractal_type = fractal_types[fractal_types_idx];

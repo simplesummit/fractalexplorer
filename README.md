@@ -109,13 +109,36 @@ Keyboard arrows pan, space zooms in, and shift+space zooms out.
 
 
 
-#### Mouse
+#### Controller
 
 You need to change macros in `src/render.c`, that start with `CONTROLLER_`.
+ 
+The current CONTROLLER_ macros are valid for the Logitech F310
 
-These control which joystick axis controls various movement
+Current controls:
 
-We have ordered controllers that haven't came in yet, so we haven't invested too much in controller input
+Left/Right triggers: zooms in and out
+
+Left/Right bumpers: decreases and increases the number of workers
+
+DPad Left and Right: Switches between types of fractals
+
+DPad Up and Down: Increase and decrease the number of iterations
+
+Left joystick: Pans in the complex plane
+
+Right joystick: Changes the `q` variable in the complex plane
+
+X button: toggles smooth shading
+
+Y button: toggles binary decomposition on imaginary component
+
+B button: toggles binary decomposition on real component
+
+A button: toggles 'theatric mode', which disables the overlay and graph
+
+Back button (aka select button): switch between computing with C and CUDA engines
+
 
 ## Bundling
 
