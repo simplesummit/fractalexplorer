@@ -4,7 +4,7 @@
   This file is part of the fractalexplorer project.
 
   fractalexplorer source code, as well as any other resources in this
-project are free software; you are free to redistribute it and/or modify them
+project are free software; you are fr`ee to redistribute it and/or modify them
 under the terms of the GNU General Public License; either version 3 of the
 license, or any later version.
 
@@ -22,12 +22,14 @@ can also find a copy at http://www.gnu.org/licenses/.
 #include "calc_c.h"
 #include "render.h"
 
+// compression library
 #include <lz4.h>
 
 #include <mpi.h>
 
 #include <math.h>
 
+// GUI library
 #include <SDL.h>
 #include <SDL_ttf.h>
 
@@ -116,6 +118,7 @@ int timeout = 50;
 // current animation
 int curr_anim = 0;
 
+// an animation state, used for when no input is detected
 typedef struct anim_param_t {
 
     int fractal_id;
@@ -132,7 +135,7 @@ typedef struct anim_param_t {
 int num_animations;
 anim_param_t * animations;
 
-// controller stuffs
+// controller stuffs, hich input buttons are hich
 //#include "controllers/logitech_dualaction.h"
 #include "controllers/snes_usb.h"
 
@@ -144,8 +147,6 @@ SDL_GameControllerAxis horiz = CONTROLLER_HORIZONTAL_AXIS,
                        znaxis = CONTROLLER_ZOOM_NEG_AXIS,
                        vaxis = CONTROLLER_V_AXIS,
                        uaxis = CONTROLLER_U_AXIS;
-
-
 
 
 // pointer to SDL render structures to use
@@ -170,7 +171,7 @@ unsigned char * legend_texture_pixels = NULL;
 int graph_cpixel = 0;
 
 
-
+// the buffers and structs for distributed communication through MPI
 int * recv_nbytes = NULL;
 unsigned char ** recv_bytes = NULL, ** recv_compressed_bytes = NULL;
 MPI_Request * recv_requests = NULL;
@@ -775,6 +776,19 @@ void fractalexplorer_render(int * argc, char ** argv) {
                         if (cevent.jbutton.button == CONTROLLER_THEATRIC_BUTTON) {
                             show_extra = !show_extra;
                             update = true;
+                        }
+                        if (cevent.jbutton.button == CONTROLLER_CYCLE_FRACTALS) {
+                            fractal_types_idx = (fractal_types_idx + 1) % FR_FRACTAL_NUM;
+                            fr.fractal_type = fractal_types[fractal_types_idx];
+                            update = true; update_anim = true;
+                            reset_fr = true;
+
+                        }
+
+                        if (cevent.jbutton.button == CONTROLLER_CYCLE_ITERATIONS) {
+                            fr.max_iter = (fr.max_iter + 100) % 2600;
+                            update = true;
+
                         }
 
                         if (cevent.jbutton.button == CONTROLLER_ZOOM_POS_BUTTON) {

@@ -129,15 +129,31 @@ void setcol(fr_col_t col, char * scheme) {
         cfnc = &setcol__random;
     } else {
         cfnc = NULL;
-        printf("error, unrecognized color scheme '%s'\n", scheme);
-        exit(1);
+        //printf("error, unrecognized color scheme '%s'\n", scheme);
+        //exit(1);
+
+        FILE * fp = NULL;
+        fp = fopen(scheme, "r");
+        if (fp == NULL) {
+            printf("Unknown color scheme '%s'\n", scheme);
+            exit(1);
+        }
+        int i;
+        char r, g, b, a;
+        for (i = 0; i < col.num; ++i) {
+            // send index and a float scaled value for convenience of calculation
+            fscanf(fp, ",,,", );
+            col.col[4 * i + 0];
+        }
         return;
     }
 
-    int i;
-    for (i = 0; i < col.num; ++i) {
-        // send index and a float scaled value for convenience of calculation
-        (*cfnc)(col, 4 * i, i, (float)(i+1) / col.num);
+    if (cfnc != NULL) {
+        int i;
+        for (i = 0; i < col.num; ++i) {
+            // send index and a float scaled value for convenience of calculation
+            (*cfnc)(col, 4 * i, i, (float)(i+1) / col.num);
+        }
     }
 
 }
