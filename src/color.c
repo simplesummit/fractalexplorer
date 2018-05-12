@@ -24,6 +24,7 @@ can also find a copy at http://www.gnu.org/licenses/.
 
 #include "fr.h"
 #include "math.h"
+#include "log.h"
 
 // color schemes are: BGRA
 
@@ -63,6 +64,28 @@ void setcol__blue(fr_col_t col, int ri, int i, float v) {
     col.col[ri + 2] = 0;
     col.col[ri + 3] = 255;
 }
+
+void setcol__cindy(fr_col_t col, int ri, int i, float v) {
+    if (i % 4 == 0) {
+        col.col[ri + 2] = 124;
+        col.col[ri + 1] = 158;
+        col.col[ri + 0] = 214;
+    } else if (i % 4 == 1) {
+        col.col[ri + 2] = 124;
+        col.col[ri + 1] = 214;
+        col.col[ri + 0] = 158;
+    } else if (i % 4 == 2) {
+        col.col[ri + 2] = 255;
+        col.col[ri + 1] = 201;
+        col.col[ri + 0] = 76;
+    } else if (i % 4 == 3) {
+        col.col[ri + 2] = 19;
+        col.col[ri + 1] = 54;
+        col.col[ri + 0] = 124;
+    }
+    col.col[ri + 3] = 255;
+}
+
 
 // mocha color scheme
 /*
@@ -125,26 +148,14 @@ void setcol(fr_col_t col, char * scheme) {
         cfnc = &setcol__simple;
     } else if (SEQ(scheme, "usa")) {
         cfnc = &setcol__usa;
+    } else if (SEQ(scheme, "cindy")) {
+        cfnc = &setcol__cindy;
     } else if (SEQ(scheme, "random")) {
         cfnc = &setcol__random;
     } else {
         cfnc = NULL;
-        //printf("error, unrecognized color scheme '%s'\n", scheme);
-        //exit(1);
-
-        FILE * fp = NULL;
-        fp = fopen(scheme, "r");
-        if (fp == NULL) {
-            printf("Unknown color scheme '%s'\n", scheme);
-            exit(1);
-        }
-        int i;
-        char r, g, b, a;
-        for (i = 0; i < col.num; ++i) {
-            // send index and a float scaled value for convenience of calculation
-            fscanf(fp, ",,,", );
-            col.col[4 * i + 0];
-        }
+        printf("error, unrecognized color scheme '%s'\n", scheme);
+        exit(1);
         return;
     }
 
