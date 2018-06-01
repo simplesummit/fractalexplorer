@@ -23,7 +23,7 @@ AM_LDFLAGS =
 
 bin_PROGRAMS = fractalexplorer
 
-fractalexplorer_SOURCES = fractalexplorer.c fractalexplorer.h fr.h color.c color.h log.c log.h calc_c.c calc_c.h  fractalexplorer_calc_cuda.h util.c util.hrender.h render.c
+fractalexplorer_SOURCES = fractalexplorer.c fractalexplorer.h fr.h log.c log.h #color.c color.h calc_c.c calc_c.h  fractalexplorer_calc_cuda.h util.c util.hrender.h render.c
 fractalexplorer_LDADD = @SDL_LDFLAGS@ -lSDL2_ttf
 fractalexplorer_CFLAGS = @SDL_CFLAGS@
 fractalexplorer_LDFLAGS =
