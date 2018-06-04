@@ -23,7 +23,7 @@
 #include "fr.h"
 
 
-#define M_EXIT MPI_Finalize(); exit(0);
+#define M_EXIT(code) MPI_Finalize(); exit(code);
 
 
 int num_nodes;
@@ -32,6 +32,11 @@ node_t * nodes;
 node_t this_node;
 
 int world_size, world_rank;
+
+#define compute_size ((world_size) - 1)
+#define compute_rank ((world_rank) - 1)
+
+
 
 char processor_name[MPI_MAX_PROCESSOR_NAME];
 int processor_name_len;

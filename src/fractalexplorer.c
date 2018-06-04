@@ -4,8 +4,8 @@
 
 #include "fr.h"
 #include "log.h"
-
-
+#include "commloop.c"
+#include "visuals.h"
 
 int num_nodes = -1;
 node_t * nodes = NULL;
@@ -62,6 +62,9 @@ int main(int argc, char ** argv) {
 
     // parsing arguments
 
+    // if it is -1000, let it pass
+    int exit_code = -1000;
+
     if (world_rank == 0) {
         char c;
 
@@ -72,7 +75,7 @@ int main(int argc, char ** argv) {
                 printf("  -h                 help menu\n");
                 printf("  -v [N]             set verbosity (1=error only, 5=trace)\n");
                 printf("\n");
-                return 0;
+                exit_code = 0;
                 break;
             case 'v':
                 if (strlen(optarg) >= 1) {
@@ -86,14 +89,16 @@ int main(int argc, char ** argv) {
                 break;
             case '?':
                 printf("Unknown argument: -%c\n", optopt);
-                return 1;
+                exit_code = 1;
                 break;
             default:
                 printf("ERROR: Unknown getopt val\n");
-                return 1;
+                exit_code = 2;
                 break;
             }
         }
+
+
 
         /*
 
@@ -112,8 +117,16 @@ int main(int argc, char ** argv) {
         int verbose_send = log_get_level();
 
         for (i = 1; i < world_size; ++i) {
+            MPI_Send(&exit_code, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
             MPI_Send(&verbose_send, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
         }       
+
+        MPI_Barrier(MPI_COMM_WORLD);
+        // all syncronized
+
+        if (exit_code != -1000) {
+            M_EXIT(exit_code);
+        }    
 
 
 
@@ -135,6 +148,7 @@ int main(int argc, char ** argv) {
 
         // default
         int GPUs_per_proc = 1;
+
 
         // set up node relations
         for (i = 1; i < world_size; ++i) {
@@ -172,10 +186,19 @@ int main(int argc, char ** argv) {
         /* get arguments */
 
         int verbose_recv;
+        // exit if not -1000
+        int exit_code_recv;
 
+        MPI_Recv(&exit_code_recv, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         MPI_Recv(&verbose_recv, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
         log_set_level(verbose_recv);
+
+        MPI_Barrier(MPI_COMM_WORLD);
+
+        if (exit_code_recv != -1000) {
+            M_EXIT(exit_code_recv);        
+        }
 
         /* respond to the above block */
 
@@ -213,12 +236,26 @@ int main(int argc, char ** argv) {
     MPI_Type_create_struct(NUM_FRACTAL_PARAMS, mpi_params_blocklengths, mpi_params_offsets, mpi_params_typearray, &mpi_params_type);
     MPI_Type_commit(&mpi_params_type);
 
+    // broadcast it
+    MPI_Bcast(&fractal_params, 1, mpi_params_type, 0, MPI_COMM_WORLD);
 
+    // barriers so everything is defined
+    MPI_Barrier(MPI_COMM_WORLD);
 
+    /*  MAIN LOOP   */
+    if (world_rank == 0) {
+        visuals_init();
+        master_loop();
+        visuals_finish();
+    } else {
+        slave_loop();
+    }
+    
 
     // ending
     MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Finalize();
+    
+    M_EXIT(0);
 
     return 0;
 

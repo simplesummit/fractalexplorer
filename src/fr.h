@@ -3,6 +3,8 @@
 #define __FR_H__
 
 #include <mpi.h>
+#include <time.h>
+#include <sys/time.h>
 
 
 /*
@@ -88,6 +90,21 @@ typedef struct fractal_params_t {
     */
 } fractal_params_t;
 
+
+typedef struct workload_t {
+    /*
+
+    this is the actual workload 
+
+    */
+
+   int assigned_cols_len;
+
+   int * assigned_cols;
+
+
+} workload_t;
+
 #define NODE_TYPE_CPU 0x0001
 #define NODE_TYPE_GPU 0x0002
 #define NODE_TYPE_MASTER 0x0003
@@ -100,20 +117,17 @@ typedef struct node_t {
 
 } node_t;
 
-typedef struct node_diagnostics_report_t {
-    // separate data structure for MPI passing
 
+typedef struct node_diagnostics_t {
+
+    /* these are reported*/
     // fahrenheit
     float temperature;
 
     float time_compute, time_compress;
 
-} node_diagnostics_report_t;
 
-typedef struct node_diagnostics_t {
-
-    // this came from what the node reported
-    node_diagnostics_report_t reported;
+    /* these are from the master node */
 
     float time_decompress, time_transfer, time_total;
 
