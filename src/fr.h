@@ -23,6 +23,12 @@ typedef struct image_t {
 }
 */
 
+//#define X_PIXEL_TO_RE(px, w, h, c, z) ((c) + ((2.0 * (px)) / (h) - 1.0) / (z))
+
+#define X_PIXEL_TO_RE(px, w, h, c, z) ((c) + (2.0 * (px) - (w)) / ((w) * (z)))
+
+#define Y_PIXEL_TO_IM(py, w, h, c, z) ((c) + ((h) - 2.0 * (py)) / (w * z))
+
 
 
 // z^2 + c
@@ -30,22 +36,29 @@ typedef struct image_t {
 
 
 
+#define FRACTAL_FLAG_NONE 0x0000
 #define FRACTAL_FLAG_GRADIENT 0x0001
 #define FRACTAL_FLAG_SPLIT_REAL 0x0002
 #define FRACTAL_FLAG_SPLIT_IMAG 0x0004
 #define FRACTAL_FLAG_ADD_PERIOD 0x0008
+#define FRACTAL_FLAG_USE_COMPRESSION 0x0010
 
 
 
 // time performance
 typedef struct tperf_t {
-    struct timeval stime, etime;
+
+    //struct timeval stime, etime;
+
+    double stime, etime;
 
     double elapsed_s;
-} tperf_t;
 
-#define tperf_start(tp) gettimeofday((tp).stime, NULL);
-#define tperf_end(tp) gettimeofday((tp).etime, NULL); (tp).elapsed_s = ((tp).etime.tv_sec - (tp).stime.tv_sec) + ((tp).etime.tv_usec - (tp).stime.tv_usec) / 1000000.0;
+} tperf_t;
+#define tperf_init(tp) tperf_start(tp); tperf_end(tp);
+#define tperf_loop(tp) tperf_end(tp); tperf_start(tp);
+#define tperf_start(tp) (tp).stime = MPI_Wtime();
+#define tperf_end(tp) { (tp).etime = MPI_Wtime(); (tp).elapsed_s = (tp).etime - (tp).stime; }
 
 
 // how many diagnostics frames to save
@@ -61,7 +74,7 @@ typedef struct fractal_params_t {
     // see FRACTAL_TYPE_* macros above
     int type;
 
-    // colorization flags
+    // colorization flags, stuff like that
     int flags;
 
     // maximum iterations
@@ -124,18 +137,17 @@ typedef struct node_diagnostics_t {
     // fahrenheit
     float temperature;
 
-    float time_compute, time_compress;
+    float time_compute, time_compress, time_total;
 
-
-    /* these are from the master node */
-
-    float time_decompress, time_transfer, time_total;
-
-    int total_rows;
+    int total_cols;
 
 } node_diagnostics_t;
 
 typedef struct diagnostics_t {
+
+    /* these are from the master node */
+
+    float time_control_update, time_assign, time_wait, time_decompress, time_recombo, time_visuals, time_total;
 
     // array for each node
     node_diagnostics_t * node_information;

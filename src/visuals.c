@@ -16,7 +16,7 @@ void visuals_init() {
 
     atexit(SDL_Quit);
 
-    int window_flags = 0;
+    int window_flags = 0;// SDL_WINDOW_FULLSCREEN_DESKTOP;
 
     window = SDL_CreateWindow("fractalexplorer", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, fractal_params.width, fractal_params.height, window_flags);
 
@@ -26,7 +26,7 @@ void visuals_init() {
     }
 
     SDL_GetWindowSize(window, &fractal_params.width, &fractal_params.height);
-    SDL_ShowCursor(SDL_DISABLE);
+//    SDL_ShowCursor(SDL_DISABLE);
 
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
@@ -61,6 +61,7 @@ void visuals_update(unsigned char * fractal_pixels) {
     // needs to be converted into "texture" into row major RGB
 
     int i, j;
+    /*
     int from_xy, to_xy;
     for (i = 0; i < fractal_params.width; ++i) {
         for (j = 0; j < fractal_params.height; ++j) {
@@ -68,13 +69,7 @@ void visuals_update(unsigned char * fractal_pixels) {
             //from_xy = 3 * (fractal_params.height * i + j);
             // row major
             //to_xy = 3 * (fractal_params.width * j + i);
-            
-            /*
-            texture_raw[to_xy + 0] = 255 * i / fractal_params.width;
-            texture_raw[to_xy + 1] = 255 * j / fractal_params.height;
-            texture_raw[to_xy + 2] = 255;
-            */
-
+        
            // printf("%d,%d,%d\n", fractal_pixels[from_xy + 0], fractal_pixels[from_xy + 1], fractal_pixels[from_xy + 2]);
             
             //texture_raw[to_xy + 0] = fractal_pixels[from_xy + 0];
@@ -83,10 +78,11 @@ void visuals_update(unsigned char * fractal_pixels) {
             ((RGB_t*)texture_raw)[j * fractal_params.width + i] = ((RGB_t*)fractal_pixels)[i * fractal_params.height + j];
         }
     }
+    */
 
     SDL_RenderClear(renderer);
 
-    SDL_UpdateTexture(texture, NULL, texture_raw, 3 * fractal_params.width);
+    SDL_UpdateTexture(texture, NULL, fractal_pixels, 3 * fractal_params.width);
     SDL_RenderCopy(renderer, texture, NULL, NULL);
 
 

@@ -52,13 +52,14 @@ int main(int argc, char ** argv) {
 
     fractal_params.width = 640;
     fractal_params.height = 480;
+    fractal_params.max_iter = 100;
     fractal_params.type = FRACTAL_TYPE_MANDELBROT;
-    fractal_params.flags = 0x0000;
-    fractal_params.center_r = 0.0;
+    fractal_params.flags = FRACTAL_FLAG_USE_COMPRESSION;
+    fractal_params.center_r = 0.25;
     fractal_params.center_i = 0.0;
     fractal_params.q_r = 0.0;
     fractal_params.q_i = 0.0;
-    fractal_params.zoom = 1.0;
+    fractal_params.zoom = .7;
 
     // parsing arguments
 
@@ -245,9 +246,11 @@ int main(int argc, char ** argv) {
     /*  MAIN LOOP   */
     if (world_rank == 0) {
         visuals_init();
+        MPI_Bcast(&fractal_params, 1, mpi_params_type, 0, MPI_COMM_WORLD);
         master_loop();
         visuals_finish();
     } else {
+        MPI_Bcast(&fractal_params, 1, mpi_params_type, 0, MPI_COMM_WORLD);
         slave_loop();
     }
     

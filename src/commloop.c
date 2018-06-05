@@ -10,6 +10,9 @@ communication stuff between head and child nodes
 
 #include "control_loop.h"
 #include "visuals.h"
+#include "fr.h"
+
+#include "lz4.h"
 
 #include "engine_c.h"
 
@@ -18,7 +21,12 @@ communication stuff between head and child nodes
 #include <stdbool.h>
 
 
+// stores the idx of the currently writing diagnostics history
+// but, to predict workloads, get the previous (in a rolling buffer)
+int diagnostics_history_idx = 0;
 diagnostics_t * diagnostics_history = NULL;
+
+int n_frames = 0;
 
 
 void send_workload(workload_t workload, int node) {
@@ -36,6 +44,11 @@ void recv_workload(workload_t * workload) {
 }
 
 
+// for quicker swaps
+typedef struct RGB_t {
+    unsigned char rgb[3];
+} RGB_t;
+
 
 void master_loop() {
     diagnostics_history = malloc(sizeof(diagnostics_t) * NUM_DIAGNOSTICS_SAVE);
@@ -45,19 +58,45 @@ void master_loop() {
     _dft.temperature = 0.0f;
     _dft.time_compute = 0.0f;
     _dft.time_compress = 0.0f;
-    _dft.time_transfer = 0.0f;
-    _dft.time_decompress = 0.0f;
     _dft.time_total = 0.0f;
 
-    _dft.total_rows = -1;
+    _dft.total_cols = -1;
 
     int i, j;
     for (i = 0; i < NUM_DIAGNOSTICS_SAVE; ++i) {
+        // default them out
+
+        diagnostics_history[i].time_control_update = 0.0f;
+        diagnostics_history[i].time_assign = 0.0f;
+        diagnostics_history[i].time_wait = 0.0f;
+        diagnostics_history[i].time_decompress = 0.0f;
+        diagnostics_history[i].time_recombo = 0.0f;
+        diagnostics_history[i].time_visuals = 0.0f;
+        diagnostics_history[i].time_total = 0.0f;
+        
         diagnostics_history[i].node_information = (node_diagnostics_t *)malloc(sizeof(node_diagnostics_t) * world_size);
         for (j = 0; j < world_size; ++j) {
             diagnostics_history[i].node_information[j] = _dft;
         }
     }
+
+    // float packed diagnostics information
+    // sent: temperature (dummy rn), time_cmopute, time_compress
+    float ** recv_diagnostics = (float **)malloc(sizeof(float *) * world_size);
+    unsigned char ** uncompressed_workloads = (char **)malloc(sizeof(char *) * world_size);
+
+    int compress_bound = LZ4_compressBound(3 * fractal_params.width * fractal_params.height);
+
+    for (i = 0; i < world_size; ++i) {
+        uncompressed_workloads[i] = (char *)malloc(3 * fractal_params.width * fractal_params.height);
+
+        recv_diagnostics[i] = (float *)malloc(sizeof(float) * 4);
+        for (j = 0; j < 4; ++j) {
+            recv_diagnostics[i][j] = 0.0f;
+        }
+    }
+
+
 
 
     /* start main loop here */
@@ -65,13 +104,18 @@ void master_loop() {
     bool keep_going = true;
 
     MPI_Request * send_requests = (MPI_Request *)malloc(sizeof(MPI_Request) * world_size);
-
     MPI_Request * recv_requests = (MPI_Request *)malloc(sizeof(MPI_Request) * world_size);
+    MPI_Request * diagnostics_recv_requests = (MPI_Request *)malloc(sizeof(MPI_Request) * world_size);
+
     MPI_Status * recv_statuses = (MPI_Status *)malloc(sizeof(MPI_Status) * world_size);
 
 
     workload_t * node_workloads = (workload_t *)malloc(sizeof(workload_t) * world_size);
     // arrays of columns
+    unsigned char ** node_results_recv = (unsigned char **)malloc(sizeof(unsigned char *) * world_size);
+    int * node_results_recv_len = (int *)malloc(sizeof(int) * world_size);
+    
+    // these are copied into so we can do smart things about when to use it, and the buffer doesnt conflict
     unsigned char ** node_results = (unsigned char **)malloc(sizeof(unsigned char *) * world_size);
     int * node_results_len = (int *)malloc(sizeof(int) * world_size);
 
@@ -81,17 +125,51 @@ void master_loop() {
     for (i = 1; i < world_size; ++i) {
         node_workloads[i].assigned_cols_len = 0;
         node_workloads[i].assigned_cols = (int *)malloc(sizeof(int) * fractal_params.width);
-        node_results[i] = (unsigned char *)malloc(3 * fractal_params.width * fractal_params.height);
-        memset(node_results[i], 0, 3 * fractal_params.width * fractal_params.height);
+        node_results_recv[i] = (unsigned char *)malloc(compress_bound);
+        node_results[i] = (unsigned char *)malloc(compress_bound);
+        //memset(node_results[i], 0, 3 * fractal_params.width * fractal_params.height);
     }
 
 
-    int to_send;
+    // this is used for status codes to quit, or send some other signal
+    // -1 means keep going
+    int to_send = -1;
 
+    tperf_t total_perf, recombo_perf, visuals_perf, waiting_perf, assigning_perf, control_update_perf;
+
+    tperf_init(total_perf);
+    tperf_init(recombo_perf);
+    tperf_init(visuals_perf);
+    tperf_init(waiting_perf);
+    tperf_init(assigning_perf);
+    tperf_init(control_update_perf);
+
+    control_update_init();
 
     while (keep_going) {
+        // for calculating loop performance
+        tperf_start(total_perf);
+
+        tperf_start(control_update_perf);
 
         control_update_t control_update = control_update_loop();
+
+        if (control_update.quit == true) {
+            to_send = 0;
+        }
+
+        MPI_Bcast(&to_send, 1, MPI_INT, 0, MPI_COMM_WORLD);
+        
+        // this means quit without error
+        if (to_send == 0) {
+            M_EXIT(0);
+        }
+        
+        tperf_end(control_update_perf);
+        diagnostics_history[diagnostics_history_idx].time_control_update = control_update_perf.elapsed_s;
+        
+
+        tperf_start(assigning_perf);
 
         // start them all off at 0
         for (i = 1; i < world_size; ++i) {
@@ -111,49 +189,150 @@ void master_loop() {
 
             node_workload_size = 3 * fractal_params.height * node_workloads[i].assigned_cols_len;
 
-            MPI_Irecv(node_results[i], node_workload_size, MPI_BYTE, i, 0, MPI_COMM_WORLD, &recv_requests[i]);
+            MPI_Irecv(node_results_recv[i], LZ4_compressBound(node_workload_size), MPI_UNSIGNED_CHAR, i, 0, MPI_COMM_WORLD, &recv_requests[i]);
+            MPI_Irecv(recv_diagnostics[i], 3, MPI_FLOAT, i, 0, MPI_COMM_WORLD, &diagnostics_recv_requests[i]);
         }
 
+        tperf_end(assigning_perf);
+        diagnostics_history[diagnostics_history_idx].time_assign = assigning_perf.elapsed_s;
+
+        /* FREE COMPUTE TIME WHILE WAITING FOR Irecv's to go through */
+
+        // we could do all the visual stuff one frame behind
+
+        tperf_start(recombo_perf);
+        if (n_frames > 0) {
+        for (i = 1; i < world_size; ++i) {
+            int col;
+
+            // you'd uncompress here
+
+
+            if (fractal_params.flags & FRACTAL_FLAG_USE_COMPRESSION) {
+                LZ4_decompress_safe((char *)node_results[i], (char *)uncompressed_workloads[i], node_results_len[i], 3 * fractal_params.width * fractal_params.height);
+            } else {
+                memcpy(uncompressed_workloads[i], node_results[i], node_results_len[i]);
+            }
+
+
+            for (j = 0; j < node_workloads[i].assigned_cols_len; ++j) {
+                col = node_workloads[i].assigned_cols[j];
+
+                // change from packed column major to full image row major
+                int row_i, to_idx, from_idx;
+                for (row_i = 0; row_i < fractal_params.height; ++row_i) {
+                    from_idx = fractal_params.height * j + row_i;
+                    to_idx = fractal_params.width * row_i + col;
+
+                    //two methods of doing this
+                    //((RGB_t *)total_image)[to_idx] = ((RGB_t *)(node_results[i]))[from_idx];
+                    total_image[3 * to_idx + 0] = uncompressed_workloads[i][3 * from_idx + 0];
+                    total_image[3 * to_idx + 1] = uncompressed_workloads[i][3 * from_idx + 1];
+                    total_image[3 * to_idx + 2] = uncompressed_workloads[i][3 * from_idx + 2];
+                }
+            }
+        }
+        }
+
+        tperf_end(recombo_perf);
+        diagnostics_history[diagnostics_history_idx].time_recombo = recombo_perf.elapsed_s;
+        
+
+
+        tperf_start(visuals_perf);
+
+        visuals_update(total_image);
+
+        tperf_end(visuals_perf);
+        diagnostics_history[diagnostics_history_idx].time_visuals = visuals_perf.elapsed_s;
+
+        tperf_start(waiting_perf);
+
+
+        MPI_Waitall(world_size-1, recv_requests + 1, recv_statuses + 1);
+        MPI_Waitall(world_size-1, diagnostics_recv_requests + 1, MPI_STATUSES_IGNORE);
+
+
+        tperf_end(waiting_perf);
+        diagnostics_history[diagnostics_history_idx].time_wait = waiting_perf.elapsed_s;
+        
 
 
         for (i = 1; i < world_size; ++i) {
 
-            MPI_Wait(&recv_requests[i], &recv_statuses[i]);
+           // MPI_Wait(&recv_requests[i], &recv_statuses[i]);
+           // MPI_Wait(&diagnostics_recv_requests[i], MPI_STATUS_IGNORE);
             
-            int col;
+            diagnostics_history[diagnostics_history_idx].node_information[i].total_cols = node_workloads[i].assigned_cols_len;
 
-            for (j = 0; j < node_workloads[i].assigned_cols_len; ++j) {
-                col = node_workloads[i].assigned_cols[j];
-                //memcpy(total_image + 3 * fractal_params.height * col, node_results + 3 * fractal_params.height * j, 3 * fractal_params.height);
-                int k, to_idx, from_idx;
-                for (k = 0; k < fractal_params.height; ++k) {
-                    to_idx = 3 * (fractal_params.height * col + k);
-                    from_idx = 3 * (fractal_params.height * j + k);
+            diagnostics_history[diagnostics_history_idx].node_information[i].temperature = recv_diagnostics[i][0];
+            diagnostics_history[diagnostics_history_idx].node_information[i].time_compute = recv_diagnostics[i][1];
+            diagnostics_history[diagnostics_history_idx].node_information[i].time_compress = recv_diagnostics[i][2];
 
-                    total_image[to_idx + 0] = node_results[i][from_idx + 0];
-                    total_image[to_idx + 1] = node_results[i][from_idx + 1];
-                    total_image[to_idx + 2] = node_results[i][from_idx + 2];
-                }
+            int num_bytes = 0;
+            MPI_Get_count(&recv_statuses[i], MPI_UNSIGNED_CHAR, &num_bytes);
+            node_results_len[i] = num_bytes;
+            memcpy(node_results[i], node_results_recv[i], num_bytes);
 
-                //memset(total_image + 3 * fractal_params.height * col, 0, 3 * fractal_params.height);
-            }
         }
 
-        visuals_update(total_image);
-        
+
+        tperf_end(total_perf);
+        diagnostics_history[diagnostics_history_idx].time_total = total_perf.elapsed_s;
+
+    /*
+        int k;
+        printf("compress FPS: ");
+        for (k = 1; k < world_size; ++k) {
+            printf("%f, ", 1.0 / recv_diagnostics[k][2]);
+        }
+        printf("\n");
+*/
+
+        /*
+
+        float longest_compute_time = 0.0f;
+        int k;
+        for (k = 1; k < world_size; ++k) {
+            if (recv_diagnostics[k][1] > longest_compute_time) {
+                longest_compute_time = recv_diagnostics[k][1];
+            }
+        }
+        */
+
+
+        //printf("FPS: %.1f\n", 1.0 / total_perf.elapsed_s);
+        //printf("visuals FPS: %.1f\n", 1.0 / visuals_perf.elapsed_s);
+
+        //printf("longest compute %%%f\n", 100.0 *longest_compute_time/total_perf.elapsed_s);
+        //printf("total %f\n", total_perf.elapsed_s);
+        //printf("waiting %f\n", (waiting_perf.elapsed_s) / total_perf.elapsed_s);
+        //printf("visual %%%f\n", 100.0 * visuals_perf.elapsed_s / total_perf.elapsed_s);
+        //printf("assigning %%%f\n", 100.0 * assigning_perf.elapsed_s / total_perf.elapsed_s);
+        //printf("recombo %%%f\n", 100.0 * recombo_perf.elapsed_s / total_perf.elapsed_s);
+        //printf("control_update %%%f\n", 100.0 * control_update_perf.elapsed_s / total_perf.elapsed_s);
+
 
         // sync up optionally
 
+        // update indexes
+        diagnostics_history_idx = (diagnostics_history_idx + 1) % NUM_DIAGNOSTICS_SAVE;
+        n_frames += 1;
     }
     for (i = 0; i < world_size; ++i) {
         free(node_workloads[i].assigned_cols);
         free(node_results[i]);
+        free(recv_diagnostics[i]);
     }
 
+
+    free(node_results);
+    free(node_workloads);
+    free(recv_diagnostics);
+    
     free(total_image);
 
-    free(node_workloads);
-    free(node_results);
+    free(diagnostics_recv_requests);
 
     free(node_results_len);
 
@@ -167,30 +346,89 @@ void slave_loop() {
 
     bool keep_going = true;
 
+    // status code
+    int to_recv;
+
+    // temperature (F, unused), time_compute, time_compress, time_total
+    float * diagnostics = (float *)malloc(sizeof(float) * 4);
+
     workload_t my_workload;
     my_workload.assigned_cols = (int *)malloc(sizeof(int) * fractal_params.width);
     unsigned char * my_result = malloc(3 * fractal_params.width * fractal_params.height);
+    unsigned char * my_compressed_buffer = malloc(LZ4_compressBound(3 * fractal_params.width * fractal_params.height));
     memset(my_result, 0, 3 * fractal_params.width * fractal_params.height);
     
     int my_result_size = 0;
 
     // initialize engine
     engine_c_init();
+
+    tperf_t compute_perf, compress_perf, total_perf;
+
+    tperf_init(compute_perf);
+    tperf_init(compress_perf);
+    tperf_init(total_perf);
     
 
     while (keep_going) {
+
+        tperf_start(total_perf);
+
+        // receive updates
+        MPI_Bcast(&to_recv, 1, MPI_INT, 0, MPI_COMM_WORLD);
+        
+        // this means quit without error
+        if (to_recv == 0) {
+            M_EXIT(0);
+        }
+
         // receive any updates
         MPI_Bcast(&fractal_params, 1, mpi_params_type, 0, MPI_COMM_WORLD);
 
         recv_workload(&my_workload);
 
+
+        tperf_start(compute_perf);
         engine_c_compute(my_workload, my_result);
+        tperf_end(compute_perf);
 
         my_result_size = 3 * fractal_params.height * my_workload.assigned_cols_len;
 
-        MPI_Send(my_result, my_result_size, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
+        if (fractal_params.flags & FRACTAL_FLAG_USE_COMPRESSION) {
+            tperf_start(compress_perf);
+            int compressed_size = LZ4_compress_default((char *)my_result, (char *)my_compressed_buffer, my_result_size, LZ4_compressBound(my_result_size));
+            tperf_end(compress_perf);
+
+            MPI_Send(my_compressed_buffer, compressed_size, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
+        } else {
+            // so it is zero
+            tperf_start(compress_perf);
+            tperf_end(compress_perf);
+            
+            MPI_Send(my_result, my_result_size, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
+        }
+
+
+        // temp, unused
+        diagnostics[0] = -1.0f;
+        // raw compute time
+        diagnostics[1] = (float)compute_perf.elapsed_s;
+        // compression, unused currently
+        diagnostics[2] = (double)compress_perf.elapsed_s;
+        // total loop time
+        diagnostics[3] = (float)total_perf.elapsed_s;
+
+        MPI_Send(diagnostics, 3, MPI_FLOAT, 0, 0, MPI_COMM_WORLD);
+
+        tperf_end(total_perf);
 
     }
+
+
+    free(diagnostics);
+    free(my_workload.assigned_cols);
+    free(my_result);
+    free(my_compressed_buffer);
 }
 
 
