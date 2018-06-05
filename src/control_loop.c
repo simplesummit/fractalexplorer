@@ -102,6 +102,11 @@ control_update_t control_update_loop() {
         fractal_params.zoom /= pow(2.5, time_mul / 1000.0);
     }
 
+    // quit
+    if (key_state[SDL_SCANCODE_ESCAPE]) {
+        result.quit = true;
+    }
+
     return result;
 }
 

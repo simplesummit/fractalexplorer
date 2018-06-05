@@ -12,7 +12,7 @@ C computation engine
 
 void engine_c_init();
 
-void engine_c_compute(workload_t workload, unsigned char * output);
+void engine_c_compute(workload_t workload, unsigned char * output, int * output_iters);
 
 
 #endif

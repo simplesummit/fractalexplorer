@@ -55,14 +55,14 @@ typedef struct tperf_t {
     double elapsed_s;
 
 } tperf_t;
-#define tperf_init(tp) tperf_start(tp); tperf_end(tp);
-#define tperf_loop(tp) tperf_end(tp); tperf_start(tp);
+#define tperf_init(tp) { tperf_start(tp); tperf_end(tp); }
+#define tperf_loop(tp) { tperf_end(tp); tperf_start(tp); }
 #define tperf_start(tp) (tp).stime = MPI_Wtime();
 #define tperf_end(tp) { (tp).etime = MPI_Wtime(); (tp).elapsed_s = (tp).etime - (tp).stime; }
 
 
 // how many diagnostics frames to save
-#define NUM_DIAGNOSTICS_SAVE 100
+#define NUM_DIAGNOSTICS_SAVE 12
 
 // a copy of this is kept on all nodes, and is updated every loop
 typedef struct fractal_params_t {
@@ -151,6 +151,13 @@ typedef struct diagnostics_t {
 
     // array for each node
     node_diagnostics_t * node_information;
+
+    
+    // array of which nodes were assigned to the (index)th column
+    int * node_assignments;
+
+    // array of how many iterations there are for each column
+    int * col_iters;
 
     // timestamp?
     struct timeval timestamp;

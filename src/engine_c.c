@@ -14,8 +14,8 @@ void engine_c_init() {
 }
 
 
-// returns 3byte packed pixels of successive rows
-void engine_c_compute(workload_t workload, unsigned char * output) {
+// returns 3byte packed pixels of successive rows, and stores the number of iterations for each column in output_iters
+void engine_c_compute(workload_t workload, unsigned char * output, int * output_iters) {
     int col_idx;
 
     int row, col;
@@ -39,9 +39,11 @@ void engine_c_compute(workload_t workload, unsigned char * output) {
 
     int iter;
     
+    int col_iters;
 
     for (col_idx = 0; col_idx < workload.assigned_cols_len; ++col_idx) {
         col = workload.assigned_cols[col_idx];
+        col_iters = 0;
 
         for (row = 0; row < fractal_params.height; ++row) {
             output_idx = 3 * (col_idx * fractal_params.height + row);
@@ -63,12 +65,16 @@ void engine_c_compute(workload_t workload, unsigned char * output) {
                 z_i2 = z_i * z_i;  
             }
 
+            col_iters += iter;
+
             // assign color
             //output[output_idx + 0] = 255 * col / fractal_params.width;
             output[output_idx + 0] = (10 * iter) % 256;
             output[output_idx + 1] = 0;
             output[output_idx + 2] = 0;
         }
+        
+        output_iters[col_idx] = col_iters;
     }
 }
 

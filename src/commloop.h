@@ -8,7 +8,10 @@ Header file for communication
 #define __COMMLOOP_H__
 
 int diagnostics_history_idx;
-node_diagnostics_t * node_diagnostics_history;
+diagnostics_t * diagnostics_history;
+
+
+int n_frames;
 
 // different loops
 void master_loop();
