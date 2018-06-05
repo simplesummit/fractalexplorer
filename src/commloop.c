@@ -195,7 +195,7 @@ void master_loop() {
         }
 
         // assign everything here
-        if (n_frames > 0 && false) {
+        if (n_frames > 0) {
             // previous data - sequential and completely proportional
 
             diagnostics_t previous_data = diagnostics_history[(diagnostics_history_idx - 1 + NUM_DIAGNOSTICS_SAVE) % NUM_DIAGNOSTICS_SAVE];
