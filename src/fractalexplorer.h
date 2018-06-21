@@ -37,13 +37,14 @@ int world_size, world_rank;
 #define compute_rank ((world_rank) - 1)
 
 
-
 char processor_name[MPI_MAX_PROCESSOR_NAME];
 int processor_name_len;
 
 MPI_Datatype mpi_params_type;
 
 fractal_params_t fractal_params;
+
+color_scheme_t color_scheme;
 
 
 int main(int argc, char ** argv);

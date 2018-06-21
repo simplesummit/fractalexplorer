@@ -44,11 +44,6 @@ void recv_workload(workload_t * workload) {
 }
 
 
-// for quicker swaps
-typedef struct RGB_t {
-    unsigned char rgb[3];
-} RGB_t;
-
 
 void master_loop() {
     diagnostics_history = malloc(sizeof(diagnostics_t) * NUM_DIAGNOSTICS_SAVE);
@@ -195,7 +190,8 @@ void master_loop() {
         }
 
         // assign everything here
-        if (n_frames > 0) {
+        // ASSIGN ALGORITHM
+        if (n_frames > 0 && true) {
             // previous data - sequential and completely proportional
 
             diagnostics_t previous_data = diagnostics_history[(diagnostics_history_idx - 1 + NUM_DIAGNOSTICS_SAVE) % NUM_DIAGNOSTICS_SAVE];
@@ -305,6 +301,7 @@ void master_loop() {
 
         tperf_start(recombo_perf);
         if (n_frames > 0) {
+
         for (i = 1; i < world_size; ++i) {
             int col;
 
@@ -326,13 +323,14 @@ void master_loop() {
                     to_idx = fractal_params.width * row_i + col;
 
                     //two methods of doing this
-                    //((RGB_t *)total_image)[to_idx] = ((RGB_t *)(node_results[i]))[from_idx];
-                    total_image[3 * to_idx + 0] = uncompressed_workloads[i][3 * from_idx + 0];
-                    total_image[3 * to_idx + 1] = uncompressed_workloads[i][3 * from_idx + 1];
-                    total_image[3 * to_idx + 2] = uncompressed_workloads[i][3 * from_idx + 2];
+                    ((RGB_t *)total_image)[to_idx] = ((RGB_t *)(uncompressed_workloads[i]))[from_idx];
+                   // total_image[3 * to_idx + 0] = uncompressed_workloads[i][3 * from_idx + 0];
+                   // total_image[3 * to_idx + 1] = uncompressed_workloads[i][3 * from_idx + 1];
+                   // total_image[3 * to_idx + 2] = uncompressed_workloads[i][3 * from_idx + 2];
                 }
             }
         }
+        
         }
 
         tperf_end(recombo_perf);
@@ -349,6 +347,7 @@ void master_loop() {
         tperf_start(control_update_perf);
 
         control_update_t control_update = control_update_loop();
+
 
         if (control_update.quit == true) {
             to_send = 0;
@@ -399,6 +398,9 @@ void master_loop() {
         tperf_end(total_perf);
         diagnostics_history[diagnostics_history_idx].time_total = total_perf.elapsed_s;
 
+
+        /* PRINT DIAGNOSTICS */
+        /*
         int k;
         float min_time = INFINITY;
         float max_time = -INFINITY;
@@ -411,8 +413,10 @@ void master_loop() {
             }
         }
         
+
         float differential = (max_time - min_time) / max_time;
 
+        */
         //printf("%f, max differential: %%%f\n", max_time, 100.0 * differential);
 
         /*
@@ -427,7 +431,7 @@ void master_loop() {
         */
 
 
-        printf("FPS: %03.1f, diff: %%%03.1f\n", 1.0 / total_perf.elapsed_s, 100.0 * differential);
+        //printf("FPS: %03.1f, diff: %%%03.1f\n", 1.0 / total_perf.elapsed_s, 100.0 * differential);
         //printf("visuals FPS: %.1f\n", 1.0 / visuals_perf.elapsed_s);
 
         //printf("longest compute %%%f\n", 100.0 *longest_compute_time/total_perf.elapsed_s);

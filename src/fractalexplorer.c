@@ -36,12 +36,15 @@ MPI_Datatype mpi_params_typearray[NUM_FRACTAL_PARAMS] = {
 MPI_Aint mpi_params_offsets[NUM_FRACTAL_PARAMS];
 
 fractal_params_t fractal_params;
-
+color_scheme_t color_scheme;
 
 
 int main(int argc, char ** argv) {
 
     MPI_Init(&argc, &argv);
+
+    // little srand for stuff to be consistent 
+    srand(42);
 
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
@@ -55,11 +58,11 @@ int main(int argc, char ** argv) {
     fractal_params.max_iter = 250;
     fractal_params.type = FRACTAL_TYPE_MANDELBROT;
     fractal_params.flags = FRACTAL_FLAG_USE_COMPRESSION;
-    fractal_params.center_r = 0.2821;
-    fractal_params.center_i = 0.01;
+    fractal_params.center_r = 0.0;//0.2821;
+    fractal_params.center_i = 0.0;//0.01;
     fractal_params.q_r = 0.0;
     fractal_params.q_i = 0.0;
-    fractal_params.zoom = 100;
+    fractal_params.zoom = 1;//100
 
     // parsing arguments
 
@@ -68,6 +71,8 @@ int main(int argc, char ** argv) {
 
     if (world_rank == 0) {
         char c;
+
+        char * color_scheme_path = NULL;
 
         while ((c = getopt(argc, argv, "v:h")) != (char)(-1)) {
             switch (c) {
@@ -97,6 +102,24 @@ int main(int argc, char ** argv) {
                 exit_code = 2;
                 break;
             }
+        }
+
+        if (color_scheme_path == NULL) {
+            
+            color_scheme.len = 12;
+            color_scheme.rgb_vals = malloc(3 * color_scheme.len);
+
+            int i;
+            for (i = 0; i < color_scheme.len; ++i) {
+                color_scheme.rgb_vals[3 * i + 0] = rand() & 0xff;
+                color_scheme.rgb_vals[3 * i + 1] = rand() & 0xff;
+                color_scheme.rgb_vals[3 * i + 2] = rand() & 0xff;
+            }
+
+        } else {
+            // find the path and read the file
+
+            free(color_scheme_path);
         }
 
 
@@ -239,6 +262,10 @@ int main(int argc, char ** argv) {
 
     // broadcast it
     MPI_Bcast(&fractal_params, 1, mpi_params_type, 0, MPI_COMM_WORLD);
+
+    MPI_Bcast(&color_scheme.len, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    if (world_rank != 0) color_scheme.rgb_vals = malloc(3 * color_scheme.len);
+    MPI_Bcast(color_scheme.rgb_vals, 3 * color_scheme.len, MPI_UNSIGNED_CHAR, 0, MPI_COMM_WORLD);
 
     // barriers so everything is defined
     MPI_Barrier(MPI_COMM_WORLD);

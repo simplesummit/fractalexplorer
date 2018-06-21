@@ -19,6 +19,10 @@ Optionally, the following are supported:
 
  * CUDA (use --with-cuda to specify)
 
+### MacOS
+
+`brew install sdl2 sdl2_ttf open-mpi lz4`
+
 
 ## On leconte
 

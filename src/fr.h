@@ -45,8 +45,17 @@ typedef struct image_t {
 
 
 
+#define MAX_COLOR_SCHEME_LENGTH 80
+
 // time performance
 typedef struct tperf_t {
+
+/* GOOD USE:
+
+tperf_t pperf; tperf_init(pperf);
+tperf_end(pperf); if (1.0 / pperf.elapsed_s < 120) printf("FPS: %.1f\n", 1.0 / pperf.elapsed_s);
+
+*/
 
     //struct timeval stime, etime;
 
@@ -60,9 +69,31 @@ typedef struct tperf_t {
 #define tperf_start(tp) (tp).stime = MPI_Wtime();
 #define tperf_end(tp) { (tp).etime = MPI_Wtime(); (tp).elapsed_s = (tp).etime - (tp).stime; }
 
+#define lin_mix(a, b, p) ((a) * (1.0 - (p)) + (b) * (p))
+
 
 // how many diagnostics frames to save
 #define NUM_DIAGNOSTICS_SAVE 12
+
+
+typedef struct RGB_t {
+    unsigned char R, G, B;
+} RGB_t;
+
+typedef struct RGBA_t {
+    unsigned char R, G, B, A;
+} RGBA_t;
+
+
+// color scheme
+typedef struct color_scheme_t {
+
+    int len;
+
+    unsigned char * rgb_vals;
+
+} color_scheme_t;
+
 
 // a copy of this is kept on all nodes, and is updated every loop
 typedef struct fractal_params_t {
