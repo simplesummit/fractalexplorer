@@ -30,9 +30,27 @@ typedef struct image_t {
 #define Y_PIXEL_TO_IM(py, w, h, c, z) ((c) + ((h) - 2.0 * (py)) / (w * z))
 
 
+#define NUM_FRACTAL_TYPES 3
 
 // z^2 + c
 #define FRACTAL_TYPE_MANDELBROT 0x0101
+
+// z^q + c
+#define FRACTAL_TYPE_MULTIBROT 0x0102
+
+// z^2 + q
+#define FRACTAL_TYPE_JULIA 0x0103
+
+// for storage and stuff
+typedef struct fractal_type_t {
+
+    int flag;
+
+    char * name;
+
+    char * equation;
+
+} fractal_type_t;
 
 
 

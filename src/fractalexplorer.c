@@ -12,12 +12,13 @@ node_t * nodes = NULL;
 
 node_t this_node;
 
+fractal_type_t * fractal_types;
+int fractal_type_idx = 0;
 
 int world_size, world_rank;
 
 char processor_name[MPI_MAX_PROCESSOR_NAME];
 int processor_name_len;
-
 
 #define NUM_FRACTAL_PARAMS 10
 
@@ -55,7 +56,7 @@ int main(int argc, char ** argv) {
 
     fractal_params.width = 640;
     fractal_params.height = 480;
-    fractal_params.max_iter = 250;
+    fractal_params.max_iter = 125;
     fractal_params.type = FRACTAL_TYPE_MANDELBROT;
     fractal_params.flags = FRACTAL_FLAG_USE_COMPRESSION;
     fractal_params.center_r = 0.0;//0.2821;
@@ -63,6 +64,20 @@ int main(int argc, char ** argv) {
     fractal_params.q_r = 0.0;
     fractal_params.q_i = 0.0;
     fractal_params.zoom = 1;//100
+
+    fractal_types = malloc(sizeof(fractal_type_t) * NUM_FRACTAL_TYPES);
+
+    fractal_types[0].flag = FRACTAL_TYPE_MANDELBROT;
+    fractal_types[0].name = strdup("Mandelbrot");
+    fractal_types[0].equation = strdup("z^2+c");
+
+    fractal_types[1].flag = FRACTAL_TYPE_MULTIBROT;
+    fractal_types[1].name = strdup("Multibrot");
+    fractal_types[1].equation = strdup("z^q+c");
+
+    fractal_types[2].flag = FRACTAL_TYPE_JULIA;
+    fractal_types[2].name = strdup("Julia");
+    fractal_types[2].equation = strdup("z^2+q");
 
     // parsing arguments
 
@@ -74,12 +89,18 @@ int main(int argc, char ** argv) {
 
         char * color_scheme_path = NULL;
 
-        while ((c = getopt(argc, argv, "v:h")) != (char)(-1)) {
+        while ((c = getopt(argc, argv, "v:q:s:c:z:i:Fh")) != (char)(-1)) {
             switch (c) {
             case 'h':
                 printf("Usage: fractal explorer [-h] [-v VERBOSE]\n");
                 printf("  -h                 help menu\n");
-                printf("  -v [N]             set verbosity (1=error only, 5=trace)\n");
+                printf("  -v [N]             set verbosity (1=error only ... 5=trace)\n");
+                printf("  -c [a+bi]          set the starting center point\n");
+                printf("  -q [a+bi]          set q parameter start\n");
+                printf("  -z [f]             set the starting zoom\n");
+                printf("  -i [N]             set maximum iterations\n");
+                printf("  -s [WxH]           set screen size (0x0 for full screen)\n");
+                printf("  -F                 full screen display\n");
                 printf("\n");
                 exit_code = 0;
                 break;
@@ -92,6 +113,25 @@ int main(int argc, char ** argv) {
                         printf("Warning: setting verbosity failed\n");
                     }
                 }
+                break;
+            case 'c':
+                sscanf(optarg, "%lf%lfi", &fractal_params.center_r, &fractal_params.center_i);
+                break;
+            case 'z':
+                sscanf(optarg, "%lf", &fractal_params.zoom);
+                break;
+            case 'q':
+                sscanf(optarg, "%lf%lfi", &fractal_params.q_r, &fractal_params.q_i);
+                break;
+            case 's':
+                sscanf(optarg, "%dx%d", &fractal_params.width, &fractal_params.height);
+                break;
+            case 'F':
+                fractal_params.width = 0;
+                fractal_params.height = 0;
+                break;
+            case 'i':
+                fractal_params.max_iter = atoi(optarg);
                 break;
             case '?':
                 printf("Unknown argument: -%c\n", optopt);
@@ -153,7 +193,6 @@ int main(int argc, char ** argv) {
         }    
 
 
-
         num_nodes = world_size;
         nodes = (node_t *)malloc(sizeof(node_t) * num_nodes);
 
@@ -201,6 +240,13 @@ int main(int argc, char ** argv) {
             MPI_Send(&nodes[i].type, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
 
         }
+
+        log_debug("starting center: %lf%+lfi", fractal_params.center_r, fractal_params.center_i);
+        log_debug("starting zoom: %lf", fractal_params.zoom);
+        log_debug("starting max_iter: %d", fractal_params.max_iter);
+        log_debug("starting q: %lf%+lfi", fractal_params.q_r, fractal_params.q_i);
+        log_debug("window size: %dx%d (0x0 means fullscreen)", fractal_params.width, fractal_params.height);
+
 
         // free the tmp, we are duplicating the things
         free(_tmp_recv_processor_name);

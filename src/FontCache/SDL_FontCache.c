@@ -2220,8 +2220,8 @@ FC_Rect FC_DrawColor(FC_Font* font, FC_Target* dest, float x, float y, SDL_Color
 
 /*
 
-I ADDED THIS METHOD
-CADE METHOD
+I ADDED THIS METHOD, so it might have some problems, but I dont think it should because its fairly straightforward
+-CADE
 
 */
 FC_Rect FC_DrawScaleColor(FC_Font* font, FC_Target* dest, float x, float y, FC_Scale scale, SDL_Color color, const char* formatted_text, ...)

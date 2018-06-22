@@ -8,6 +8,7 @@ C computation engine
 #include "engine_c.h"
 #include "fractalexplorer.h"
 #include "math.h"
+#include "complex.h"
 
 
 void engine_c_init() {
@@ -33,25 +34,15 @@ void engine_c_compute(workload_t workload, unsigned char * output, int * output_
 
     */
 
-    double z_r, z_i, c_r, c_i;
-
-    double z_r2, z_i2;
-
-
     int iter;
-    
     int col_iters;
 
     RGB_t cur_color;
-
     RGB_t * _output_rgb = (RGB_t *)output;
-
     RGB_t col_before, col_after;
-
     double partial_iteration;
 
     RGB_t _local_color_scheme[MAX_COLOR_SCHEME_LENGTH];
-
     double final_phase;
 
     for (i = 0; i < color_scheme.len; ++i) {
@@ -60,6 +51,27 @@ void engine_c_compute(workload_t workload, unsigned char * output, int * output_
         _local_color_scheme[i].B = color_scheme.rgb_vals[3 * i + 2];
     }
 
+    /*
+
+    complex numbers
+
+    */
+    
+    double complex z, c;
+
+    // shouldn't change
+    double complex q = fractal_params.q_r + I * fractal_params.q_i;
+    
+
+    // for optimized routines
+    double z_r, z_i, c_r, c_i;
+    double z_r2, z_i2;
+
+
+    // shouldn't change
+    double q_r = fractal_params.q_r, q_i = fractal_params.q_i;
+
+
     for (col_idx = 0; col_idx < workload.assigned_cols_len; ++col_idx) {
         col = workload.assigned_cols[col_idx];
         col_iters = 0;
@@ -67,27 +79,72 @@ void engine_c_compute(workload_t workload, unsigned char * output, int * output_
         for (row = 0; row < fractal_params.height; ++row) {
             output_idx = col_idx * fractal_params.height + row;
 
-            c_r = X_PIXEL_TO_RE(col, fractal_params.width, fractal_params.height, fractal_params.center_r, fractal_params.zoom);
-            c_i = Y_PIXEL_TO_IM(row, fractal_params.width, fractal_params.height, fractal_params.center_i, fractal_params.zoom);
-            
-            z_r = c_r;
-            z_i = c_i;
+            /*
+            // complex numbers
 
-            z_r2 = z_r * z_r;
-            z_i2 = z_i * z_i;
+            c = X_PIXEL_TO_RE(col, fractal_params.width, fractal_params.height, fractal_params.center_r, fractal_params.zoom) + I * Y_PIXEL_TO_IM(row, fractal_params.width, fractal_params.height, fractal_params.center_i, fractal_params.zoom);
 
-            for (iter = 0; iter < fractal_params.max_iter && z_r2 + z_i2 <= 16.0; ++iter) {
-                z_i = 2 * z_r * z_i + c_i;
-                z_r = z_r2 - z_i2 + c_r;
-                z_r2 = z_r * z_r;
-                z_i2 = z_i * z_i;  
+
+            if (fractal_params.type == FRACTAL_TYPE_MANDELBROT) {
+                z = c;
+
+                for (iter = 0; iter < fractal_params.max_iter && cabs(z) <= 16.0; ++iter) {
+                    z = z * z + c;
+                }
+
+                partial_iteration = 2 + iter - log(log(cabs(z))) / log(2.0);
             }
 
-            final_phase = atan2(c_i, c_r);
+            */
 
-            partial_iteration = 2 + iter - log(log(z_r2 + z_i2)) / log(2.0);
+            // using doubles only
+            c_r = X_PIXEL_TO_RE(col, fractal_params.width, fractal_params.height, fractal_params.center_r, fractal_params.zoom);
+            c_i = Y_PIXEL_TO_IM(row, fractal_params.width, fractal_params.height, fractal_params.center_i, fractal_params.zoom);
 
-            double color_final = iter;// partial_iteration;
+            c = c_r + I * c_i;
+            
+            if (fractal_params.type == FRACTAL_TYPE_MANDELBROT) {
+                // z**2 + c
+                z_r = c_r;
+                z_i = c_i;
+
+                z_r2 = z_r * z_r;
+                z_i2 = z_i * z_i;
+
+                for (iter = 0; iter < fractal_params.max_iter && z_r2 + z_i2 <= 256.0; ++iter) {
+                    z_i = 2 * z_r * z_i + c_i;
+                    z_r = z_r2 - z_i2 + c_r;
+                    z_r2 = z_r * z_r;
+                    z_i2 = z_i * z_i;  
+                }
+
+                partial_iteration = 3 + iter - log(log(z_r2 + z_i2)) / log(2.0);
+            } else if (fractal_params.type == FRACTAL_TYPE_MULTIBROT) {
+                // z**q + c
+
+                z = c;
+
+                for (iter = 0; iter < fractal_params.max_iter && cabs(z) <= 16.0; ++iter) {
+                    z = cpow(z, q) + c;
+                }
+
+                partial_iteration = 2 + iter - log(log(cabs(z))) / log(cabs(q));
+            } else if (fractal_params.type == FRACTAL_TYPE_JULIA) {
+                // z**2 + q
+
+                z = c;
+
+                for (iter = 0; iter < fractal_params.max_iter && cabs(z) <= 16.0; ++iter) {
+                    z = z * z + q;
+                }
+
+                partial_iteration = 2 + iter - log(log(cabs(z))) / log(2.0);
+            }
+
+
+            // these work for all fractals
+            
+            double color_final = partial_iteration;
 
             double partial_int = floor(color_final);
             double gradient = color_final - partial_int;
@@ -105,12 +162,6 @@ void engine_c_compute(workload_t workload, unsigned char * output, int * output_
             cur_color.G = lin_mix(col_before.G, col_after.G, gradient);
             cur_color.B = lin_mix(col_before.B, col_after.B, gradient);
 
-            //cur_color.R = (10 * iter) % 256;
-            //cur_color.G = 0;
-            //cur_color.B = 0;
-
-            // assign color
-            //output[output_idx + 0] = 255 * col / fractal_params.width;
             _output_rgb[output_idx] = cur_color;
         }
         

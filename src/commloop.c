@@ -329,8 +329,6 @@ void master_loop() {
                    // total_image[3 * to_idx + 2] = uncompressed_workloads[i][3 * from_idx + 2];
                 }
             }
-            log_trace("TRACE POINT after");
-            
         }
         
         }

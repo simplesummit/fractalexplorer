@@ -44,7 +44,11 @@ void visuals_init() {
 
     atexit(SDL_Quit);
 
-    int window_flags = SDL_WINDOW_FULLSCREEN_DESKTOP;
+    int window_flags = 0;// SDL_WINDOW_FULLSCREEN_DESKTOP;
+
+    if (fractal_params.width == 0 || fractal_params.height == 0) {
+        window_flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+    }
 
     window = SDL_CreateWindow("fractalexplorer", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, fractal_params.width, fractal_params.height, window_flags);
 
@@ -426,7 +430,7 @@ void visuals_update(unsigned char * fractal_pixels) {
         sprintf(info_graph_messages[2], "Zoom: %.2e", fractal_params.zoom);
         FC_Draw(font, renderer, info_graph_texture_xoff, info_graph_texture_yoff + 2 * font_size, info_graph_messages[2]);
 
-        sprintf(info_graph_messages[3], "Nodes: %d", world_size - 1);
+        sprintf(info_graph_messages[3], "Eqn: %s, Nodes: %d", fractal_types[fractal_type_idx].equation, world_size - 1);
         FC_Draw(font, renderer, info_graph_texture_xoff, info_graph_texture_yoff + 3 * font_size, info_graph_messages[3]);
         
         // put FPS on screen

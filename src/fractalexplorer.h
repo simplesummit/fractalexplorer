@@ -44,6 +44,9 @@ MPI_Datatype mpi_params_type;
 
 fractal_params_t fractal_params;
 
+int fractal_type_idx;
+fractal_type_t * fractal_types;
+
 color_scheme_t color_scheme;
 
 
