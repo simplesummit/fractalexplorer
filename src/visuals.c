@@ -19,6 +19,10 @@ int assign_col_graph_w, assign_col_graph_h;
 SDL_Texture * assign_col_graph_texture;
 unsigned char * assign_col_graph_texture_raw;
 
+int performance_graph_w, performance_graph_h;
+SDL_Texture * performance_graph_texture;
+unsigned char * performance_graph_texture_raw;
+
 int info_graph_w, info_graph_h;
 int info_graph_texture_xoff, info_graph_texture_yoff;
 SDL_Texture * info_graph_texture;
@@ -67,7 +71,7 @@ void visuals_init() {
 
     // font caching
 
-    font_size = fractal_params.width / 28;
+    font_size = 10 + fractal_params.width / 50;
     font = FC_CreateFont();
     FC_LoadFont(font, renderer, "./UbuntuMono.ttf", font_size, FC_MakeColor(0, 0, 0, 255), TTF_STYLE_NORMAL);
 
@@ -79,7 +83,7 @@ void visuals_init() {
     }
 
     assign_col_graph_w = fractal_params.width;
-    assign_col_graph_h = fractal_params.height / 4;
+    assign_col_graph_h = fractal_params.height / 5;
 
     assign_col_graph_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, assign_col_graph_w, assign_col_graph_h);
     if (assign_col_graph_texture == NULL) {
@@ -90,8 +94,8 @@ void visuals_init() {
     assign_col_graph_texture_raw = malloc(4 * assign_col_graph_w * assign_col_graph_h);
 
 
-    info_graph_w = 45 * fractal_params.width / 100;
-    info_graph_h = fractal_params.width / 4;
+    info_graph_w = font_size * 12;
+    info_graph_h = 27 * font_size / 4;
     info_graph_texture_xoff = font_size / 2;
     info_graph_texture_yoff = font_size / 4;
 
@@ -120,6 +124,19 @@ void visuals_init() {
         info_graph_messages[i] = malloc(MAX_INFO_GRAPH_MESSAGE_LEN);
     }
 
+    // performance chart
+    performance_graph_w = 12 * font_size;
+    performance_graph_h = 27 * font_size / 4;
+
+    performance_graph_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, performance_graph_w, performance_graph_h);
+    if (performance_graph_texture == NULL) {
+        log_fatal("Fail on SDL_CreateTexture(): %s", SDL_GetError());
+        M_EXIT(1);
+    }
+    SDL_SetTextureBlendMode(performance_graph_texture, SDL_BLENDMODE_BLEND);
+    performance_graph_texture_raw = malloc(4 * performance_graph_w * performance_graph_h);
+
+
 }
 
 // used for hsl conversion
@@ -142,6 +159,11 @@ RGBA_t get_nth_node_color(int n) {
     return res;
 }
 
+
+SDL_Color SCOLOR(RGBA_t col) {
+    SDL_Color result = {col.R, col.G, col.B, col.A};
+    return result;
+}
 void visuals_update(unsigned char * fractal_pixels) {
     // fractal_pixels contains column major order in RGB
     // needs to be converted into "texture" into row major RGB
@@ -155,6 +177,15 @@ void visuals_update(unsigned char * fractal_pixels) {
     // do graphs here
 
 
+
+    RGBA_t compute_color = {255, 0, 0, 255};
+    RGBA_t io_color = {0, 255, 0, 255};
+    RGBA_t compress_color = {0, 0, 255, 255};
+    RGBA_t rest_color = {255, 0, 255, 255};
+
+
+    RGBA_t unfill_color = {0, 0, 0, 0};
+    RGBA_t barrier_color = {0, 0, 0, 255};
 
     if (n_frames > 0) {
 
@@ -178,11 +209,10 @@ void visuals_update(unsigned char * fractal_pixels) {
             }
         }
 
-
         for (i = 0; i < assign_col_graph_w; ++i) {
             RGBA_t col_color = get_nth_node_color(last_diagnostics.node_assignments[i]);
 
-            col_color.A = 170;
+            col_color.A = 155;
 
             // this makes the height based on proportion
             //int col_height =(int) (((float)assign_col_graph_h * assign_col_graph_h * last_diagnostics.col_iters[i]) / total_iterations);
@@ -191,21 +221,125 @@ void visuals_update(unsigned char * fractal_pixels) {
             
             ct = 0;
 
-            for (j = assign_col_graph_h; ct < col_height && ct < assign_col_graph_h; ++ct) {
-                idx = i + j * assign_col_graph_w;
-                ((RGBA_t *)assign_col_graph_texture_raw)[idx] = col_color;
-                //assign_col_graph_texture_raw[4 * idx + 3] = 140;
-                j--;
+            for (j = 0; j < assign_col_graph_h - col_height; ++j) {
+                ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * j + i] = unfill_color;
             }
-            for (; ct < assign_col_graph_h; ct++) {
-                idx = i + j * assign_col_graph_w;
 
-                assign_col_graph_texture_raw[4 * idx + 3] = 0;
-                j--;
+            if (j == 0) {
+                // fill top 2
+                ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * 0 + i] = barrier_color;
+                ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * 1 + i] = barrier_color;
+            } else if (j == assign_col_graph_h) {
+                ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * (j-1) + i] = barrier_color;
+                ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * (j-2) + i] = barrier_color;
+            } else {
+                ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * j + i] = barrier_color;
+                ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * (j - 1) + i] = barrier_color;
             }
+
+            // barrier
+            j += 2;
+
+
+            while (j < assign_col_graph_h) {
+                ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * j + i] = col_color;
+                j++;
+            }
+
         }
 
         SDL_UpdateTexture(assign_col_graph_texture, NULL, assign_col_graph_texture_raw, 4 * assign_col_graph_w);
+
+        // 4 fps, longest time to show
+        float biggest_time = 1.0 / 4.0;
+
+        for (i = 0; i < performance_graph_w; ++i) {
+            
+            int diag_idx = ((diagnostics_history_idx + i - performance_graph_w) % NUM_DIAGNOSTICS_SAVE + NUM_DIAGNOSTICS_SAVE) % NUM_DIAGNOSTICS_SAVE;
+            diagnostics_t cur_graph_diag = diagnostics_history[diag_idx];
+
+            int k;
+            float max_compute_time = -INFINITY;
+            float max_compress_time = -INFINITY;
+            float max_io_time = -INFINITY;
+            for (k = 1; k < world_size; ++k) {
+                if (cur_graph_diag.node_information[k].time_compute > max_compute_time) {
+                    max_compute_time = cur_graph_diag.node_information[k].time_compute;
+                }
+                if (cur_graph_diag.node_information[k].time_compress > max_compress_time) {
+                    max_compress_time = cur_graph_diag.node_information[k].time_compress;
+                }                
+                if (cur_graph_diag.node_information[k].time_io > max_io_time) {
+                    max_io_time = cur_graph_diag.node_information[k].time_io;
+                }
+            }
+            
+
+            float compute_prop = max_compute_time / biggest_time;
+            float io_prop = (max_io_time + cur_graph_diag.time_recombo) / biggest_time;
+            float compress_prop = (max_compress_time + cur_graph_diag.time_decompress) / biggest_time;
+
+            float total_prop = cur_graph_diag.time_total / biggest_time;
+
+            float rest_prop = total_prop - (compute_prop + io_prop + compress_prop);
+
+
+            float proportion_filled = 0.0f;
+            int cur_section = 0;
+            int cur_section_filled = 0;
+
+            bool is_graph = false;
+
+            for (j = 0; j < performance_graph_h; j++) {
+                proportion_filled = (float)(j - font_size / 2) / (performance_graph_h - font_size / 2);
+
+                is_graph = true;
+                if (j < font_size) {
+                    is_graph = false;
+                    ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * j] = barrier_color;
+                } else if (proportion_filled < compute_prop || (cur_section == 0 && cur_section_filled < 2)){ // sec 0
+                    ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * j] = compute_color;
+                } else if (proportion_filled - compute_prop < compress_prop || (cur_section == 1 && cur_section_filled < 2)) { //sec 1
+                    if (cur_section != 1) {
+                        cur_section = 1;
+                        ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * j] = barrier_color;
+                    } else {
+                        ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * j] = compress_color;
+                    }
+                } else if (proportion_filled - compute_prop - compress_prop < io_prop || (cur_section == 2 && cur_section_filled < 2)) { //sec 2
+                    if (cur_section != 2) {
+                        cur_section = 2;
+                        ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * j] = barrier_color;
+                    } else {
+                        ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * j] = io_color;
+                    }
+
+                } else if (proportion_filled < total_prop || (cur_section == 3 && cur_section_filled < 2)) { //sec 3
+                    if (cur_section != 3) {
+                        cur_section = 3;
+                        ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * j] = barrier_color;
+                        j++;
+                    } else {
+                        ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * j] = rest_color;
+                    }
+                } else { //sec 4
+                    ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * j] = unfill_color;
+                    is_graph = false;
+                }
+                
+                if (j >= font_size && is_graph && i < performance_graph_w / 4) {
+                    float xprop = 4.0 * i / performance_graph_w;
+                    float alpha = xprop - (1.0 - xprop) * pow(proportion_filled, 4) / 1.5;
+                    if (alpha < 0.0) alpha = 0.0;
+                    if (alpha > 1.0) alpha = 1.0;
+                    ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * j].A = (unsigned char)floor(255 * alpha);
+                }
+
+                cur_section_filled++;
+            }
+        }
+
+        SDL_UpdateTexture(performance_graph_texture, NULL, performance_graph_texture_raw, 4 * performance_graph_w);
 
     }
 
@@ -232,8 +366,44 @@ void visuals_update(unsigned char * fractal_pixels) {
     SDL_RenderCopy(renderer, info_graph_texture, NULL, &info_dst_rect);
 
 
+    SDL_Rect performance_dst_rect;
+    performance_dst_rect.x = fractal_params.width - performance_graph_w;
+    performance_dst_rect.y = 0;
+    performance_dst_rect.w = performance_graph_w;
+    performance_dst_rect.h = performance_graph_h;
+
+    SDL_RenderCopy(renderer, performance_graph_texture, NULL, &performance_dst_rect);
+
+
+
+    float fscale = 1.0;
+    FC_Scale fc_fscale = FC_MakeScale(fscale, fscale);
+
+
+    sprintf(info_graph_messages[0], "compute");
+
+
+    // messages onto performance graph
+    FC_DrawScaleColor(font, renderer, performance_dst_rect.x + info_graph_texture_xoff / 2, performance_dst_rect.y - font_size / 10, fc_fscale, SCOLOR(compute_color), info_graph_messages[0]);
+
+
+
+    sprintf(info_graph_messages[0], "compress");
+
+    FC_DrawScaleColor(font, renderer, performance_dst_rect.x + info_graph_texture_xoff / 2 + 3.74 * fscale * font_size, performance_dst_rect.y - fscale * font_size / 9, fc_fscale, SCOLOR(compress_color), info_graph_messages[0]);
+
+    sprintf(info_graph_messages[0], "io");
+
+    FC_DrawScaleColor(font, renderer, performance_dst_rect.x + info_graph_texture_xoff / 2 + 7.9 * fscale * font_size, performance_dst_rect.y - fscale * font_size / 9, fc_fscale, SCOLOR(io_color), info_graph_messages[0]);
+
+    sprintf(info_graph_messages[0], "misc");
+
+    FC_DrawScaleColor(font, renderer, performance_dst_rect.x + info_graph_texture_xoff / 2 + 9.12 * fscale * font_size, performance_dst_rect.y - fscale * font_size / 9, fc_fscale, SCOLOR(rest_color), info_graph_messages[0]);
+
+
 
     FC_Draw(font, renderer, info_graph_texture_xoff, info_graph_texture_yoff, "Fractal Explorer");
+    
     
     // text stuff
 

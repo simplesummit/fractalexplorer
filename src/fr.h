@@ -73,7 +73,7 @@ tperf_end(pperf); if (1.0 / pperf.elapsed_s < 120) printf("FPS: %.1f\n", 1.0 / p
 
 
 // how many diagnostics frames to save
-#define NUM_DIAGNOSTICS_SAVE 12
+#define NUM_DIAGNOSTICS_SAVE 1920
 
 
 typedef struct RGB_t {
@@ -168,7 +168,7 @@ typedef struct node_diagnostics_t {
     // fahrenheit
     float temperature;
 
-    float time_compute, time_compress, time_total;
+    float time_compute, time_compress, time_total, time_io;
 
     int total_cols;
 

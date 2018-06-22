@@ -2218,6 +2218,24 @@ FC_Rect FC_DrawColor(FC_Font* font, FC_Target* dest, float x, float y, SDL_Color
     return FC_RenderLeft(font, dest, x, y, FC_MakeScale(1,1), fc_buffer);
 }
 
+/*
+
+I ADDED THIS METHOD
+CADE METHOD
+
+*/
+FC_Rect FC_DrawScaleColor(FC_Font* font, FC_Target* dest, float x, float y, FC_Scale scale, SDL_Color color, const char* formatted_text, ...)
+{
+    if(formatted_text == NULL || font == NULL)
+        return FC_MakeRect(x, y, 0, 0);
+
+    FC_EXTRACT_VARARGS(fc_buffer, formatted_text);
+
+    set_color_for_all_caches(font, color);
+
+    return FC_RenderLeft(font, dest, x, y, scale, fc_buffer);
+}
+
 
 FC_Rect FC_DrawEffect(FC_Font* font, FC_Target* dest, float x, float y, FC_Effect effect, const char* formatted_text, ...)
 {

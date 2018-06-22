@@ -87,8 +87,8 @@ void master_loop() {
     for (i = 0; i < world_size; ++i) {
         uncompressed_workloads[i] = (char *)malloc(3 * fractal_params.width * fractal_params.height);
 
-        recv_diagnostics[i] = (float *)malloc(sizeof(float) * 4);
-        for (j = 0; j < 4; ++j) {
+        recv_diagnostics[i] = (float *)malloc(sizeof(float) * 5);
+        for (j = 0; j < 5; ++j) {
             recv_diagnostics[i][j] = 0.0f;
         }
     }
@@ -140,9 +140,6 @@ void master_loop() {
         //memset(node_results[i], 0, 3 * fractal_params.width * fractal_params.height);
     }
 
-    srand(time(NULL));
-
-
     // assigning utils:
 
     // in proportion of iter/sec of each node
@@ -171,6 +168,8 @@ void master_loop() {
     control_update_init();
 
     while (keep_going) {
+        log_trace("start frame %d", n_frames);
+        
         // for calculating loop performance
         tperf_start(total_perf);
 
@@ -190,8 +189,8 @@ void master_loop() {
         }
 
         // assign everything here
-        // ASSIGN ALGORITHM
-        if (n_frames > 0 && true) {
+        // ASSIGN ALGORITHM, probably needs work
+        if (n_frames > 0 && false) {
             // previous data - sequential and completely proportional
 
             diagnostics_t previous_data = diagnostics_history[(diagnostics_history_idx - 1 + NUM_DIAGNOSTICS_SAVE) % NUM_DIAGNOSTICS_SAVE];
@@ -209,7 +208,7 @@ void master_loop() {
 
             for (i = 0; i < fractal_params.width; ++i) {
                 cur_node = previous_data.node_assignments[i];
-                cur_performance = previous_data.col_iters[i] / previous_data.node_information[cur_node].time_total;
+                cur_performance = previous_data.col_iters[i] / previous_data.node_information[cur_node].time_compute;
                 performance_proportion[cur_node] += cur_performance;
                 total_performance += cur_performance;
 
@@ -220,6 +219,7 @@ void master_loop() {
             }
             
             // normalize some values beforehand (detect near neibors)
+            /*
             for (i = 1 + 1; i < world_size; ++i) {
                 if (((float)world_size * (performance_proportion[i] - performance_proportion[i - 1])) / total_performance < .4f) {
                     float nval = (performance_proportion[i] + performance_proportion[i - 1]) / 2.0f;
@@ -227,6 +227,7 @@ void master_loop() {
                     performance_proportion[i] = nval;
                 }
             }
+            */
 
 
             for (i = 1; i < world_size; ++i) {
@@ -236,8 +237,6 @@ void master_loop() {
             for (i = 0; i < fractal_params.width; ++i) {
                 col_work_proportion[i] /= total_col_work;
             }
-
-
 
             // performance is calculated
         
@@ -250,9 +249,8 @@ void master_loop() {
 
 
             for (i = 0; i < fractal_params.width; ++i) {
-                if (given_to_cur_worker > 5 && cumulative_work_assigned >= cur_proportion_goal && cur_worker_assigning < world_size - 1) {
+                if (given_to_cur_worker >= 0 && cumulative_work_assigned >= cur_proportion_goal && cur_worker_assigning < world_size - 1) {
                     cur_worker_assigning++;
-                    given_to_cur_worker = 0;
                     cur_proportion_goal += performance_proportion[cur_worker_assigning];
                 }
                 // now assign
@@ -287,7 +285,7 @@ void master_loop() {
 
             MPI_Irecv(node_results_recv[i], LZ4_compressBound(node_workload_size), MPI_UNSIGNED_CHAR, i, 0, MPI_COMM_WORLD, &recv_requests[i]);
             MPI_Irecv(recv_col_iters[i], node_workloads[i].assigned_cols_len, MPI_INT, i, 0, MPI_COMM_WORLD, &col_iters_recv_requests[i]);
-            MPI_Irecv(recv_diagnostics[i], 4, MPI_FLOAT, i, 0, MPI_COMM_WORLD, &diagnostics_recv_requests[i]);
+            MPI_Irecv(recv_diagnostics[i], 5, MPI_FLOAT, i, 0, MPI_COMM_WORLD, &diagnostics_recv_requests[i]);
         }
 
         tperf_end(assigning_perf);
@@ -312,6 +310,8 @@ void master_loop() {
                 memcpy(uncompressed_workloads[i], prev_node_results[i], prev_node_results_len[i]);
             }
 
+            log_trace("TRACE POINT b4 %d", i);
+
 
             for (j = 0; j < previous_node_workloads[i].assigned_cols_len; ++j) {
                 col = previous_node_workloads[i].assigned_cols[j];
@@ -329,6 +329,8 @@ void master_loop() {
                    // total_image[3 * to_idx + 2] = uncompressed_workloads[i][3 * from_idx + 2];
                 }
             }
+            log_trace("TRACE POINT after");
+            
         }
         
         }
@@ -338,9 +340,15 @@ void master_loop() {
         
         tperf_start(visuals_perf);
 
+        log_trace("before visuals update");
+
         visuals_update(total_image);
 
+        log_trace("after visuals update");
+
         tperf_end(visuals_perf);
+
+
         diagnostics_history[diagnostics_history_idx].time_visuals = visuals_perf.elapsed_s;
 
 
@@ -380,6 +388,7 @@ void master_loop() {
             diagnostics_history[diagnostics_history_idx].node_information[i].time_compute = recv_diagnostics[i][1];
             diagnostics_history[diagnostics_history_idx].node_information[i].time_compress = recv_diagnostics[i][2];
             diagnostics_history[diagnostics_history_idx].node_information[i].time_total = recv_diagnostics[i][3];
+            diagnostics_history[diagnostics_history_idx].node_information[i].time_io = recv_diagnostics[i][4];
 
             for (j = 0; j < node_workloads[i].assigned_cols_len; ++j) {
                 diagnostics_history[diagnostics_history_idx].col_iters[node_workloads[i].assigned_cols[j]] = recv_col_iters[i][j];
@@ -452,6 +461,7 @@ void master_loop() {
             memcpy(previous_node_workloads[i].assigned_cols, node_workloads[i].assigned_cols, sizeof(int) * node_workloads[i].assigned_cols_len);
             previous_node_workloads[i].assigned_cols_len = node_workloads[i].assigned_cols_len;
         }
+        
     }
     for (i = 0; i < world_size; ++i) {
         free(node_workloads[i].assigned_cols);
@@ -484,7 +494,7 @@ void slave_loop() {
     int to_recv;
 
     // temperature (F, unused), time_compute, time_compress, time_total
-    float * diagnostics = (float *)malloc(sizeof(float) * 4);
+    float * diagnostics = (float *)malloc(sizeof(float) * 5);
 
     workload_t my_workload;
     my_workload.assigned_cols = (int *)malloc(sizeof(int) * fractal_params.width);
@@ -500,11 +510,12 @@ void slave_loop() {
     // initialize engine
     engine_c_init();
 
-    tperf_t compute_perf, compress_perf, total_perf;
+    tperf_t compute_perf, compress_perf, total_perf, io_perf;
 
     tperf_init(compute_perf);
     tperf_init(compress_perf);
     tperf_init(total_perf);
+    tperf_init(io_perf);
     
 
     while (keep_going) {
@@ -536,13 +547,17 @@ void slave_loop() {
             int compressed_size = LZ4_compress_default((char *)my_result, (char *)my_compressed_buffer, my_result_size, LZ4_compressBound(my_result_size));
             tperf_end(compress_perf);
 
+            tperf_start(io_perf);
             MPI_Send(my_compressed_buffer, compressed_size, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
+            tperf_end(io_perf);
         } else {
             // so it is zero
             tperf_start(compress_perf);
             tperf_end(compress_perf);
-            
+
+            tperf_start(io_perf);
             MPI_Send(my_result, my_result_size, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
+            tperf_end(io_perf);
         }
 
         // send iterations per column
@@ -560,8 +575,9 @@ void slave_loop() {
         
         // total loop time
         diagnostics[3] = (float)total_perf.elapsed_s;
+        diagnostics[4] = (float)io_perf.elapsed_s;
 
-        MPI_Send(diagnostics, 4, MPI_FLOAT, 0, 0, MPI_COMM_WORLD);
+        MPI_Send(diagnostics, 5, MPI_FLOAT, 0, 0, MPI_COMM_WORLD);
 
 
     }
