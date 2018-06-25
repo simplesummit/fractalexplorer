@@ -32,16 +32,18 @@ fractalexplorer_CFLAGS = @SDL_CFLAGS@
 fractalexplorer_LDFLAGS =
 
 if HAVE_CUDA
-fractalexplorer_LDADD += #calc_cuda.o
+fractalexplorer_LDADD += engine_cuda.o
 fractalexplorer_LDFLAGS += -lcuda -lcudart -lcudadevrt
 fractalexplorer_LDADD += -lcuda -lcudart -lcudadevrt
 endif
 
 
 # TODO: test if nvcc itself supports -Ofast
-NVCC_CFLAGS = -Xcompiler -Ofast -gencode arch=compute_62,code=sm_62 #-gencode arch=compute_62,code=compute_62 #-gencode arch=compute_52,code=sm_52 -gencode arch=compute_53,code=sm_53 -gencode arch=compute_60,code=sm_60 -gencode arch=compute_62,code=sm_62 -gencode arch=compute_62,code=compute_62
+NVCC_CFLAGS = -Xcompiler -Ofast -gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=sm_35 -gencode arch=compute_37,code=sm_37 -gencode arch=compute_50,code=sm_50 -gencode arch=compute_52,code=sm_52 -gencode arch=compute_60,code=sm_60 -gencode arch=compute_61,code=sm_61 -gencode arch=compute_62,code=sm_62 -gencode arch=compute_62,code=compute_62 -gencode arch=compute_52,code=sm_52 -gencode arch=compute_53,code=sm_53 -gencode arch=compute_60,code=sm_60 -gencode arch=compute_62,code=sm_62 -gencode arch=compute_62,code=compute_62
 CUDA_CFLAGS = @CUDA_CFLAGS@
 CUDA_LDFLAGS = @CUDA_LDFLAGS@
 
-calc_cuda.o: calc_cuda.cu fr.h
-	$(NVCC) $(CUDA_CFLAGS) $(NVCC_CFLAGS) -Xptxas -allow-expensive-optimizations=true -use_fast_math -Xcompiler -Ofast -Xcompiler -ffast-math -Xcompiler -fPIC -I. -I.. -DHAVE_CONFIG_H -m64 $(CUDA_LDFLAGS) -lib -o $@ -c $<
+engine_cuda.o: engine_cuda.cu engine_cuda.h fr.h
+	$(NVCC) $(CUDA_CFLAGS) $(NVCC_CFLAGS) -Xptxas -allow-expensive-optimizations=true -use_fast_math -Xcompiler -Ofast -Xcompiler -ffast-math -Xcompiler -fPIC -I. -I.. -DHAVE_CONFIG_H -m64 $(CUDA_LDFLAGS) -lib -o $@ -c $< 
+
+# the -ccbin is special for macos and is just a thing sometimes you have to do

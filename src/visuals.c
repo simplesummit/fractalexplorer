@@ -19,6 +19,11 @@ int assign_col_graph_w, assign_col_graph_h;
 SDL_Texture * assign_col_graph_texture;
 unsigned char * assign_col_graph_texture_raw;
 
+// legend
+int assign_col_legend_w, assign_col_legend_h;
+SDL_Texture * assign_col_legend_texture;
+unsigned char * assign_col_legend_texture_raw;
+
 int performance_graph_w, performance_graph_h;
 SDL_Texture * performance_graph_texture;
 unsigned char * performance_graph_texture_raw;
@@ -27,6 +32,9 @@ int info_graph_w, info_graph_h;
 int info_graph_texture_xoff, info_graph_texture_yoff;
 SDL_Texture * info_graph_texture;
 unsigned char * info_graph_texture_raw;
+
+
+double _last_fps_val = 0.0;
 
 #define NUM_INFO_GRAPH_MESSAGES 10
 #define MAX_INFO_GRAPH_MESSAGE_LEN 100
@@ -75,7 +83,7 @@ void visuals_init() {
 
     // font caching
 
-    font_size = 10 + fractal_params.width / 50;
+    font_size = 8 + fractal_params.width / 50;
     font = FC_CreateFont();
     FC_LoadFont(font, renderer, "./UbuntuMono.ttf", font_size, FC_MakeColor(0, 0, 0, 255), TTF_STYLE_NORMAL);
 
@@ -98,8 +106,21 @@ void visuals_init() {
     assign_col_graph_texture_raw = malloc(4 * assign_col_graph_w * assign_col_graph_h);
 
 
-    info_graph_w = font_size * 12;
-    info_graph_h = 27 * font_size / 4;
+#define LEGEND_TEXT_SCALE 0.8
+    assign_col_legend_w = (int)floor(font_size * 3.6 * LEGEND_TEXT_SCALE);
+    assign_col_legend_h = (int)floor((world_size - 1) * font_size * LEGEND_TEXT_SCALE);
+
+    assign_col_legend_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, assign_col_legend_w, assign_col_legend_h);
+    if (assign_col_legend_texture == NULL) {
+        log_fatal("Fail on SDL_CreateTexture(): %s", SDL_GetError());
+        M_EXIT(1);
+    }
+    SDL_SetTextureBlendMode(assign_col_legend_texture, SDL_BLENDMODE_BLEND);
+    assign_col_legend_texture_raw = malloc(4 * assign_col_legend_w * assign_col_legend_h);
+
+
+    info_graph_w = 25 * font_size / 2;
+    info_graph_h = 31 * font_size / 4;
     info_graph_texture_xoff = font_size / 2;
     info_graph_texture_yoff = font_size / 4;
 
@@ -216,7 +237,7 @@ void visuals_update(unsigned char * fractal_pixels) {
         for (i = 0; i < assign_col_graph_w; ++i) {
             RGBA_t col_color = get_nth_node_color(last_diagnostics.node_assignments[i]);
 
-            col_color.A = 155;
+            col_color.A = 175;
 
             // this makes the height based on proportion
             //int col_height =(int) (((float)assign_col_graph_h * assign_col_graph_h * last_diagnostics.col_iters[i]) / total_iterations);
@@ -233,12 +254,12 @@ void visuals_update(unsigned char * fractal_pixels) {
                 // fill top 2
                 ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * 0 + i] = barrier_color;
                 ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * 1 + i] = barrier_color;
-            } else if (j == assign_col_graph_h) {
+            } else if (j == assign_col_graph_h - 1) {
+                ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * j + i] = barrier_color;
                 ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * (j-1) + i] = barrier_color;
-                ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * (j-2) + i] = barrier_color;
             } else {
                 ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * j + i] = barrier_color;
-                ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * (j - 1) + i] = barrier_color;
+                ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * (j + 1) + i] = barrier_color;
             }
 
             // barrier
@@ -253,6 +274,26 @@ void visuals_update(unsigned char * fractal_pixels) {
         }
 
         SDL_UpdateTexture(assign_col_graph_texture, NULL, assign_col_graph_texture_raw, 4 * assign_col_graph_w);
+
+
+
+        // put information
+
+        int w;
+        for (w = 1; w < world_size; ++w) {
+            RGBA_t cur_col = get_nth_node_color(w);
+            cur_col.A = 200;
+            for (i = 0; i < assign_col_legend_w; ++i) {
+                for (j = (int)floor((w-1) * font_size * LEGEND_TEXT_SCALE); j < (int)floor(w * font_size * LEGEND_TEXT_SCALE); ++j) {
+                    ((RGBA_t *)assign_col_legend_texture_raw)[i + assign_col_legend_w * j] = cur_col;
+                }
+            }
+
+        }
+
+        SDL_UpdateTexture(assign_col_legend_texture, NULL, assign_col_legend_texture_raw, 4 * assign_col_legend_w);
+
+
 
         // 4 fps, longest time to show
         float biggest_time = 1.0 / 4.0;
@@ -361,6 +402,25 @@ void visuals_update(unsigned char * fractal_pixels) {
     SDL_RenderCopy(renderer, assign_col_graph_texture, NULL, &assign_col_dst_rect);
 
 
+    SDL_Rect assign_legend_dst_rect;
+    assign_legend_dst_rect.x = fractal_params.width - assign_col_legend_w;
+    assign_legend_dst_rect.y = fractal_params.height - assign_col_legend_h;
+    assign_legend_dst_rect.w = assign_col_legend_w;
+    assign_legend_dst_rect.h = assign_col_legend_h;
+    
+    SDL_RenderCopy(renderer, assign_col_legend_texture, NULL, &assign_legend_dst_rect);
+
+    int w;
+    for (w = 1; w < world_size; ++w) {
+
+        SDL_Color text_color = { 0, 0, 0, 255 };
+
+        sprintf(info_graph_messages[1], "Node #%d", w);
+        FC_DrawScaleColor(font, renderer, assign_legend_dst_rect.x, assign_legend_dst_rect.y + (w-1) * font_size * LEGEND_TEXT_SCALE, FC_MakeScale(LEGEND_TEXT_SCALE, LEGEND_TEXT_SCALE), text_color, info_graph_messages[1]);
+    }
+
+
+
     SDL_Rect info_dst_rect;
     info_dst_rect.x = 0;
     info_dst_rect.y = 0;
@@ -424,18 +484,37 @@ void visuals_update(unsigned char * fractal_pixels) {
         int prec = 6;
 
         // put center, zoom, stuff
-        sprintf(info_graph_messages[1], "At: %.*f%+.*fi", prec, fractal_params.center_r, prec,fractal_params.center_i);
+        sprintf(info_graph_messages[1], "At: %+.*f%+.*fi", prec, fractal_params.center_r, prec,fractal_params.center_i);
         FC_Draw(font, renderer, info_graph_texture_xoff, info_graph_texture_yoff + 1 * font_size, info_graph_messages[1]);
 
-        sprintf(info_graph_messages[2], "Zoom: %.2e", fractal_params.zoom);
-        FC_Draw(font, renderer, info_graph_texture_xoff, info_graph_texture_yoff + 2 * font_size, info_graph_messages[2]);
+        // put center, zoom, stuff
+        sprintf(info_graph_messages[1], "q : %+.*f%+.*fi", prec, fractal_params.q_r, prec,fractal_params.q_i);
+        FC_Draw(font, renderer, info_graph_texture_xoff, info_graph_texture_yoff + 2 * font_size, info_graph_messages[1]);
 
-        sprintf(info_graph_messages[3], "Eqn: %s, Nodes: %d", fractal_types[fractal_type_idx].equation, world_size - 1);
-        FC_Draw(font, renderer, info_graph_texture_xoff, info_graph_texture_yoff + 3 * font_size, info_graph_messages[3]);
+        sprintf(info_graph_messages[2], "Zoom: %.2e", fractal_params.zoom);
+        FC_Draw(font, renderer, info_graph_texture_xoff, info_graph_texture_yoff + 3 * font_size, info_graph_messages[2]);
+
+        sprintf(info_graph_messages[3], "Eqn: %s", fractal_types[fractal_type_idx].equation);
+        FC_Draw(font, renderer, info_graph_texture_xoff, info_graph_texture_yoff + 4 * font_size, info_graph_messages[3]);
         
         // put FPS on screen
-        sprintf(info_graph_messages[0], "FPS: %.1f", 1.0 / last_diagnostics.time_total);
-        FC_Draw(font, renderer, info_graph_texture_xoff, info_graph_texture_yoff + 4 * font_size, info_graph_messages[0]);
+
+        double cur_fps_val = 1.0 / last_diagnostics.time_total;
+
+        // smooth it out:
+        double RC = 1.0 / ((cur_fps_val / 16.0) * 2 * M_PI);
+        double dt = last_diagnostics.time_total;
+        double alpha = dt / (RC + dt);
+        
+
+        double lped = _last_fps_val * (1.0 - alpha) + alpha * cur_fps_val;
+
+        _last_fps_val = lped;
+
+        //if ((lped - cur_fps_val) > 3) log_debug("DIFF: %lf", lped - cur_fps_val);
+
+        sprintf(info_graph_messages[0], "Nodes: %d, FPS: %.1f", world_size - 1, lped);
+        FC_Draw(font, renderer, info_graph_texture_xoff, info_graph_texture_yoff + 5 * font_size, info_graph_messages[0]);
 
         // calculate node difference maximum
         int k;
@@ -454,7 +533,7 @@ void visuals_update(unsigned char * fractal_pixels) {
 
 
         sprintf(info_graph_messages[4], "Parallelism: %.1f%s", 100.0 * (1.0 - differential), "%%");
-        FC_Draw(font, renderer, info_graph_texture_xoff, info_graph_texture_yoff + 5 * font_size, info_graph_messages[4]);
+        FC_Draw(font, renderer, info_graph_texture_xoff, info_graph_texture_yoff + 6 * font_size, info_graph_messages[4]);
 
 
     }

@@ -12,7 +12,7 @@ C computation engine
 
 
 void engine_c_init() {
-    // init method, but C doesn't need it
+    // init method, but C doesn't need it for anything
 }
 
 

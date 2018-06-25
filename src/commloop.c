@@ -15,6 +15,9 @@ communication stuff between head and child nodes
 #include "lz4.h"
 
 #include "engine_c.h"
+#ifdef HAVE_CUDA
+#include "engine_cuda.h"
+#endif
 
 #include <mpi.h>
 
@@ -190,7 +193,7 @@ void master_loop() {
 
         // assign everything here
         // ASSIGN ALGORITHM, probably needs work
-        if (n_frames > 0 && false) {
+        if (n_frames > 0 && true) {
             // previous data - sequential and completely proportional
 
             diagnostics_t previous_data = diagnostics_history[(diagnostics_history_idx - 1 + NUM_DIAGNOSTICS_SAVE) % NUM_DIAGNOSTICS_SAVE];
@@ -249,7 +252,8 @@ void master_loop() {
 
 
             for (i = 0; i < fractal_params.width; ++i) {
-                if (given_to_cur_worker >= 0 && cumulative_work_assigned >= cur_proportion_goal && cur_worker_assigning < world_size - 1) {
+                // mimum assignment of 10
+                if (given_to_cur_worker >= 10 && cumulative_work_assigned >= cur_proportion_goal && cur_worker_assigning < world_size - 1) {
                     cur_worker_assigning++;
                     cur_proportion_goal += performance_proportion[cur_worker_assigning];
                 }
@@ -508,6 +512,10 @@ void slave_loop() {
     // initialize engine
     engine_c_init();
 
+    #ifdef HAVE_CUDA
+    engine_cuda_init(fractal_params);
+    #endif
+
     tperf_t compute_perf, compress_perf, total_perf, io_perf;
 
     tperf_init(compute_perf);
@@ -535,7 +543,8 @@ void slave_loop() {
         recv_workload(&my_workload);
 
         tperf_start(compute_perf);        
-        engine_c_compute(my_workload, my_result, my_result_iters);
+        //engine_c_compute(my_workload, my_result, my_result_iters);
+        engine_cuda_compute(my_workload, my_result, my_result_iters);
         tperf_end(compute_perf);
 
         my_result_size = 3 * fractal_params.height * my_workload.assigned_cols_len;
