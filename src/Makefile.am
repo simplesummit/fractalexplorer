@@ -40,8 +40,8 @@ endif
 
 # TODO: test if nvcc itself supports -Ofast
 NVCC_CFLAGS = -Xcompiler -Ofast -gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=sm_35 -gencode arch=compute_37,code=sm_37 -gencode arch=compute_50,code=sm_50 -gencode arch=compute_52,code=sm_52 -gencode arch=compute_60,code=sm_60 -gencode arch=compute_61,code=sm_61 -gencode arch=compute_62,code=sm_62 -gencode arch=compute_62,code=compute_62 -gencode arch=compute_52,code=sm_52 -gencode arch=compute_53,code=sm_53 -gencode arch=compute_60,code=sm_60 -gencode arch=compute_62,code=sm_62 -gencode arch=compute_62,code=compute_62
-CUDA_CFLAGS = @CUDA_CFLAGS@
-CUDA_LDFLAGS = @CUDA_LDFLAGS@
+CUDA_CFLAGS = @CUDA_CFLAGS@ $(foreach arg,$(shell mpicc --showme:compile), -Xcompiler $(arg))
+CUDA_LDFLAGS = @CUDA_LDFLAGS@  $(foreach arg,$(shell mpicc --showme:link), -Xlinker $(arg))
 
 engine_cuda.o: engine_cuda.cu engine_cuda.h fr.h
 	$(NVCC) $(CUDA_CFLAGS) $(NVCC_CFLAGS) -Xptxas -allow-expensive-optimizations=true -use_fast_math -Xcompiler -Ofast -Xcompiler -ffast-math -Xcompiler -fPIC -I. -I.. -DHAVE_CONFIG_H -m64 $(CUDA_LDFLAGS) -lib -o $@ -c $< 

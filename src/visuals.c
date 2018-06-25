@@ -3,8 +3,12 @@
 
 #include "commloop.h"
 #include "log.h"
-#include "SDL.h"
+#include "SDL2/SDL.h"
 #include "FontCache/SDL_FontCache.h"
+
+#ifndef SDL_PIXELFORMAT_RGBA32
+#define SDL_PIXELFORMAT_RGBA32 SDL_PIXELFORMAT_RGBA8888
+#endif
 
 
 // main stuff
@@ -34,6 +38,11 @@ SDL_Texture * info_graph_texture;
 unsigned char * info_graph_texture_raw;
 
 
+// blend modes
+
+SDL_BlendMode overlay_mode;
+
+
 double _last_fps_val = 0.0;
 
 #define NUM_INFO_GRAPH_MESSAGES 10
@@ -49,6 +58,16 @@ void visuals_init() {
         log_fatal("Fail on SDL_Init(): %s", SDL_GetError());
         M_EXIT(1);
     }
+
+    SDL_version comp, link;
+    
+    SDL_VERSION(&comp);
+
+    SDL_GetVersion(&link);
+
+    log_info("compiled with SDL version %d.%d.%d", comp.major, comp.minor, comp.patch);
+    log_info("linked currently with SDL version %d.%d.%d", link.major, link.minor.link.patch);
+
 
     atexit(SDL_Quit);
 
@@ -68,15 +87,20 @@ void visuals_init() {
     SDL_GetWindowSize(window, &fractal_params.width, &fractal_params.height);
 //    SDL_ShowCursor(SDL_DISABLE);
 
-    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED); //SDL_RENDERER_ACCELERATED
 
     if (renderer == NULL) {
         log_fatal("Fail on SDL_CreateRenderer(): %s", SDL_GetError());
         M_EXIT(1);
     }
 
+    overlay_mode = SDL_ComposeBlendMode(SDL_BLENDFACTOR_SRC_ALPHA, SDL_BLENDFACTOR_ONE_MINUS_SRC_ALPHA, SDL_BLENDOPERATION_ADD, SDL_BLENDFACTOR_ZERO, SDL_BLENDFACTOR_ONE, SDL_BLENDOPERATION_ADD);
+
+
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    //SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+
+    SDL_SetRenderDrawBlendMode(renderer, overlay_mode);
 
     SDL_RenderClear(renderer);
     SDL_RenderPresent(renderer);

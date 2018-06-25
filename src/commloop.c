@@ -513,7 +513,7 @@ void slave_loop() {
     engine_c_init();
 
     #ifdef HAVE_CUDA
-    engine_cuda_init(fractal_params);
+    engine_cuda_init(fractal_params, color_scheme.len, color_scheme.rgb_vals);
     #endif
 
     tperf_t compute_perf, compress_perf, total_perf, io_perf;

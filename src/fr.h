@@ -2,9 +2,9 @@
 #ifndef __FR_H__
 #define __FR_H__
 
-#include <mpi.h>
-#include <time.h>
-#include <sys/time.h>
+//#include <mpi.h>
+//#include <time.h>
+//#include <sys/time.h>
 
 
 /*
@@ -209,7 +209,7 @@ typedef struct diagnostics_t {
     int * col_iters;
 
     // timestamp?
-    struct timeval timestamp;
+    //struct timeval timestamp;
 
 } diagnostics_t;
 
