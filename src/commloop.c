@@ -543,8 +543,8 @@ void slave_loop() {
         recv_workload(&my_workload);
 
         tperf_start(compute_perf);        
-        //engine_c_compute(my_workload, my_result, my_result_iters);
-        engine_cuda_compute(my_workload, my_result, my_result_iters);
+        engine_c_compute(my_workload, my_result, my_result_iters);
+        //engine_cuda_compute(my_workload, my_result, my_result_iters);
         tperf_end(compute_perf);
 
         my_result_size = 3 * fractal_params.height * my_workload.assigned_cols_len;

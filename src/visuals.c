@@ -6,9 +6,9 @@
 #include "SDL2/SDL.h"
 #include "FontCache/SDL_FontCache.h"
 
-#ifndef SDL_PIXELFORMAT_RGBA32
-#define SDL_PIXELFORMAT_RGBA32 SDL_PIXELFORMAT_RGBA8888
-#endif
+//#ifndef SDL_PIXELFORMAT_RGBA32
+///#define SDL_PIXELFORMAT_RGBA32 SDL_PIXELFORMAT_RGBA8888
+//#endif
 
 
 // main stuff
@@ -66,7 +66,7 @@ void visuals_init() {
     SDL_GetVersion(&link);
 
     log_info("compiled with SDL version %d.%d.%d", comp.major, comp.minor, comp.patch);
-    log_info("linked currently with SDL version %d.%d.%d", link.major, link.minor.link.patch);
+    log_info("linked currently with SDL version %d.%d.%d", link.major, link.minor, link.patch);
 
 
     atexit(SDL_Quit);
@@ -94,11 +94,12 @@ void visuals_init() {
         M_EXIT(1);
     }
 
-    overlay_mode = SDL_ComposeBlendMode(SDL_BLENDFACTOR_SRC_ALPHA, SDL_BLENDFACTOR_ONE_MINUS_SRC_ALPHA, SDL_BLENDOPERATION_ADD, SDL_BLENDFACTOR_ZERO, SDL_BLENDFACTOR_ONE, SDL_BLENDOPERATION_ADD);
+    //overlay_mode = SDL_ComposeCustomBlendMode(SDL_BLENDFACTOR_SRC_ALPHA, SDL_BLENDFACTOR_ONE_MINUS_SRC_ALPHA, SDL_BLENDOPERATION_ADD, SDL_BLENDFACTOR_ZERO, SDL_BLENDFACTOR_ONE, SDL_BLENDOPERATION_ADD);
 
+    //overlay_mode = SDL_BLENDMODE_BLEND;
 
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-    //SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
     SDL_SetRenderDrawBlendMode(renderer, overlay_mode);
 
