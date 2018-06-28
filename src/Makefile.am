@@ -28,7 +28,7 @@ fractalexplorer_SOURCES = fractalexplorer.c fractalexplorer.h fr.h log.c log.h e
 fractalexplorer_SOURCES += FontCache/SDL_FontCache.c FontCache/SDL_FontCache.h
 
 fractalexplorer_LDADD = @SDL_LDFLAGS@ -lSDL2_ttf
-fractalexplorer_CFLAGS = @SDL_CFLAGS@
+fractalexplorer_CFLAGS = -fopenmp @SDL_CFLAGS@
 fractalexplorer_LDFLAGS =
 
 if HAVE_CUDA

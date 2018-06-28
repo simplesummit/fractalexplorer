@@ -69,7 +69,7 @@ int main(int argc, char ** argv) {
     fractal_params.height = 480;
     fractal_params.max_iter = 125;
     fractal_params.type = FRACTAL_TYPE_MANDELBROT;
-    fractal_params.flags = FRACTAL_FLAG_USE_COMPRESSION;
+    fractal_params.flags = 0;//FRACTAL_FLAG_USE_COMPRESSION;
     fractal_params.center_r = 0.0;//0.2821;
     fractal_params.center_i = 0.0;//0.01;
     fractal_params.q_r = 0.0;

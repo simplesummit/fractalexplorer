@@ -304,6 +304,8 @@ void master_loop() {
         tperf_start(recombo_perf);
         if (n_frames > 0) {
 
+
+#pragma omp parallel for
         for (i = 1; i < world_size; ++i) {
             int col;
 
@@ -314,21 +316,26 @@ void master_loop() {
                 memcpy(uncompressed_workloads[i], prev_node_results[i], prev_node_results_len[i]);
             }
 
-            log_trace("TRACE POINT b4 %d", i);
 
+            //log_trace("TRACE POINT b4 %d", i);
 
-            for (j = 0; j < previous_node_workloads[i].assigned_cols_len; ++j) {
-                col = previous_node_workloads[i].assigned_cols[j];
+            int k;
+            for (k = 0; k < previous_node_workloads[i].assigned_cols_len; ++k) {
+                col = previous_node_workloads[i].assigned_cols[k];
 
                 // change from packed column major to full image row major
                 int row_i, to_idx, from_idx;
                 for (row_i = 0; row_i < fractal_params.height; ++row_i) {
-                    from_idx = fractal_params.height * j + row_i;
+                    from_idx = fractal_params.height * k + row_i;
                     to_idx = fractal_params.width * row_i + col;
 
                     //two methods of doing this
+
+
                     ((RGB_t *)total_image)[to_idx] = ((RGB_t *)(uncompressed_workloads[i]))[from_idx];
-                   // total_image[3 * to_idx + 0] = uncompressed_workloads[i][3 * from_idx + 0];
+ 
+
+                  // total_image[3 * to_idx + 0] = uncompressed_workloads[i][3 * from_idx + 0];
                    // total_image[3 * to_idx + 1] = uncompressed_workloads[i][3 * from_idx + 1];
                    // total_image[3 * to_idx + 2] = uncompressed_workloads[i][3 * from_idx + 2];
                 }

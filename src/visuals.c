@@ -116,7 +116,7 @@ void visuals_init() {
 
     // font caching
 
-    font_size = 8 + fractal_params.width / 50;
+    font_size = 6 + fractal_params.width / 60;
     font = FC_CreateFont();
     FC_LoadFont(font, renderer, "./UbuntuMono.ttf", font_size, FC_MakeColor(0, 0, 0, 255), TTF_STYLE_NORMAL);
 
@@ -267,6 +267,7 @@ void visuals_update(unsigned char * fractal_pixels) {
             }
         }
 
+#pragma omp parallel for
         for (i = 0; i < assign_col_graph_w; ++i) {
             RGBA_t col_color = get_nth_node_color(last_diagnostics.node_assignments[i]);
 
@@ -278,30 +279,31 @@ void visuals_update(unsigned char * fractal_pixels) {
             int col_height =(int) (((float)assign_col_graph_h * last_diagnostics.col_iters[i]) / max_iterations);
             
             ct = 0;
+            int k;
 
-            for (j = 0; j < assign_col_graph_h - col_height; ++j) {
-                ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * j + i] = unfill_color;
+            for (k = 0; k < assign_col_graph_h - col_height; ++k) {
+                ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * k + i] = unfill_color;
             }
 
-            if (j == 0) {
+            if (k == 0) {
                 // fill top 2
                 ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * 0 + i] = barrier_color;
                 ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * 1 + i] = barrier_color;
-            } else if (j == assign_col_graph_h - 1) {
-                ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * j + i] = barrier_color;
-                ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * (j-1) + i] = barrier_color;
+            } else if (k == assign_col_graph_h - 1) {
+                ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * k + i] = barrier_color;
+                ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * (k-1) + i] = barrier_color;
             } else {
-                ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * j + i] = barrier_color;
-                ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * (j + 1) + i] = barrier_color;
+                ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * k + i] = barrier_color;
+                ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * (k + 1) + i] = barrier_color;
             }
 
             // barrier
-            j += 2;
+            k += 2;
 
 
-            while (j < assign_col_graph_h) {
-                ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * j + i] = col_color;
-                j++;
+            while (k < assign_col_graph_h) {
+                ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * k + i] = col_color;
+                k++;
             }
 
         }
@@ -331,6 +333,8 @@ void visuals_update(unsigned char * fractal_pixels) {
         // 4 fps, longest time to show
         float biggest_time = 1.0 / 4.0;
 
+
+//#pragma omp parallel for
         for (i = 0; i < performance_graph_w; ++i) {
             
             int diag_idx = ((diagnostics_history_idx + i - performance_graph_w) % NUM_DIAGNOSTICS_SAVE + NUM_DIAGNOSTICS_SAVE) % NUM_DIAGNOSTICS_SAVE;
@@ -354,7 +358,13 @@ void visuals_update(unsigned char * fractal_pixels) {
             
 
             float compute_prop = max_compute_time / biggest_time;
-            float io_prop = (max_io_time + cur_graph_diag.time_recombo) / biggest_time;
+            float io_prop = max_io_time;
+            if (cur_graph_diag.time_wait < 0.01) {
+                // only count the recombo if it was waited on
+                io_prop += cur_graph_diag.time_recombo;
+            }
+
+            io_prop /= biggest_time;
             float compress_prop = (max_compress_time + cur_graph_diag.time_decompress) / biggest_time;
 
             float total_prop = cur_graph_diag.time_total / biggest_time;
@@ -368,49 +378,49 @@ void visuals_update(unsigned char * fractal_pixels) {
 
             bool is_graph = false;
 
-            for (j = 0; j < performance_graph_h; j++) {
-                proportion_filled = (float)(j - font_size / 2) / (performance_graph_h - font_size / 2);
+            for (k = 0; k < performance_graph_h; k++) {
+                proportion_filled = (float)(k - font_size) / (performance_graph_h - font_size);
 
                 is_graph = true;
-                if (j < font_size) {
+                if (k < font_size) {
                     is_graph = false;
-                    ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * j] = barrier_color;
+                    ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * k] = barrier_color;
                 } else if (proportion_filled < compute_prop || (cur_section == 0 && cur_section_filled < 2)){ // sec 0
-                    ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * j] = compute_color;
+                    ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * k] = compute_color;
                 } else if (proportion_filled - compute_prop < compress_prop || (cur_section == 1 && cur_section_filled < 2)) { //sec 1
                     if (cur_section != 1) {
                         cur_section = 1;
-                        ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * j] = barrier_color;
+                        ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * k] = barrier_color;
                     } else {
-                        ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * j] = compress_color;
+                        ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * k] = compress_color;
                     }
                 } else if (proportion_filled - compute_prop - compress_prop < io_prop || (cur_section == 2 && cur_section_filled < 2)) { //sec 2
                     if (cur_section != 2) {
                         cur_section = 2;
-                        ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * j] = barrier_color;
+                        ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * k] = barrier_color;
                     } else {
-                        ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * j] = io_color;
+                        ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * k] = io_color;
                     }
 
                 } else if (proportion_filled < total_prop || (cur_section == 3 && cur_section_filled < 2)) { //sec 3
                     if (cur_section != 3) {
                         cur_section = 3;
-                        ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * j] = barrier_color;
+                        ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * k] = barrier_color;
                         j++;
                     } else {
-                        ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * j] = rest_color;
+                        ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * k] = rest_color;
                     }
                 } else { //sec 4
-                    ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * j] = unfill_color;
+                    ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * k] = unfill_color;
                     is_graph = false;
                 }
                 
-                if (j >= font_size && is_graph && i < performance_graph_w / 4) {
+                if (k >= font_size && is_graph && i < performance_graph_w / 4) {
                     float xprop = 4.0 * i / performance_graph_w;
                     float alpha = xprop - (1.0 - xprop) * pow(proportion_filled, 4) / 1.5;
                     if (alpha < 0.0) alpha = 0.0;
                     if (alpha > 1.0) alpha = 1.0;
-                    ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * j].A = (unsigned char)floor(255 * alpha);
+                    ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * k].A = (unsigned char)floor(255 * alpha);
                 }
 
                 cur_section_filled++;
