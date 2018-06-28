@@ -411,8 +411,14 @@ void visuals_update(unsigned char * fractal_pixels) {
                         ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * k] = rest_color;
                     }
                 } else { //sec 4
-                    ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * k] = unfill_color;
-                    is_graph = false;
+                    if (cur_section != 4) {
+                        cur_section = 4;
+                        ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * k] = barrier_color;
+                        j++;
+                    } else {
+                        ((RGBA_t *)performance_graph_texture_raw)[i + performance_graph_w * k] = unfill_color;
+                        is_graph = false;
+                    }
                 }
                 
                 if (k >= font_size && is_graph && i < performance_graph_w / 4) {
