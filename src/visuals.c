@@ -284,10 +284,12 @@ void visuals_update(unsigned char * fractal_pixels) {
 
         int stripe_size = (int)floor(font_size * LEGEND_TEXT_SCALE / 2);
 
+
 #pragma omp parallel for
         for (i = 0; i < assign_col_graph_w; ++i) {
             RGBA_t col_color = get_nth_node_color(last_diagnostics.node_assignments[i]);
 
+            bool worker_changed = i != 0 && (last_diagnostics.node_assignments[i] != last_diagnostics.node_assignments[i - 1]);
             col_color.A = 175;
             RGBA_t comp_color = get_complimentary_color(col_color);
 
@@ -320,7 +322,9 @@ void visuals_update(unsigned char * fractal_pixels) {
 
 
             while (k < assign_col_graph_h) {
-                if (nodes[last_diagnostics.node_assignments[i]].type == NODE_TYPE_CPU) {
+                if (worker_changed) {
+                    ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * k + i] = barrier_color;                
+                } else if (nodes[last_diagnostics.node_assignments[i]].type == NODE_TYPE_CPU) {
                     ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * k + i] = col_color;
                 } else {
                     if (((k + i) % (2 * stripe_size) + (2 * stripe_size)) % (2 * stripe_size) < 2 * stripe_size / 3) {
