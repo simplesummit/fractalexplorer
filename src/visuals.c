@@ -217,6 +217,20 @@ RGBA_t get_nth_node_color(int n) {
     return res;
 }
 
+RGBA_t invert_color(RGBA_t a) {
+    a.R = 255 - a.R;
+    a.G = 255 - a.G;
+    a.B = 255 - a.B;
+    return a;
+} 
+
+RGBA_t get_complimentary_color(RGBA_t a) {
+    a.R = (unsigned char)lin_mix(a.R, 255, 0.5);
+    a.G = (unsigned char)lin_mix(a.G, 255, 0.5);
+    a.B = (unsigned char)lin_mix(a.B, 255, 0.5);
+    return a;
+}
+
 
 SDL_Color SCOLOR(RGBA_t col) {
     SDL_Color result = {col.R, col.G, col.B, col.A};
@@ -267,11 +281,15 @@ void visuals_update(unsigned char * fractal_pixels) {
             }
         }
 
+
+        int stripe_size = (int)floor(font_size * LEGEND_TEXT_SCALE / 2);
+
 #pragma omp parallel for
         for (i = 0; i < assign_col_graph_w; ++i) {
             RGBA_t col_color = get_nth_node_color(last_diagnostics.node_assignments[i]);
 
             col_color.A = 175;
+            RGBA_t comp_color = get_complimentary_color(col_color);
 
             // this makes the height based on proportion
             //int col_height =(int) (((float)assign_col_graph_h * assign_col_graph_h * last_diagnostics.col_iters[i]) / total_iterations);
@@ -302,7 +320,17 @@ void visuals_update(unsigned char * fractal_pixels) {
 
 
             while (k < assign_col_graph_h) {
-                ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * k + i] = col_color;
+                if (nodes[w].type == NODE_TYPE_CPU) {
+                    ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * k + i] = col_color;
+                } else {
+                    if (((k + i) % (2 * stripe_size) + (2 * stripe_size)) % (2 * stripe_size) < 2 * stripe_size / 3) {
+                        ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * k + i] = comp_color;
+                    } else {
+                        ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * k + i] = col_color;
+                    }
+                }
+
+
                 k++;
             }
 
@@ -312,15 +340,24 @@ void visuals_update(unsigned char * fractal_pixels) {
 
 
 
-        // put information
+        // put node names
 
         int w;
         for (w = 1; w < world_size; ++w) {
             RGBA_t cur_col = get_nth_node_color(w);
+            RGBA_t comp_col = get_complimentary_color(cur_col);
             cur_col.A = 200;
             for (i = 0; i < assign_col_legend_w; ++i) {
                 for (j = (int)floor((w-1) * font_size * LEGEND_TEXT_SCALE); j < (int)floor(w * font_size * LEGEND_TEXT_SCALE); ++j) {
-                    ((RGBA_t *)assign_col_legend_texture_raw)[i + assign_col_legend_w * j] = cur_col;
+                    if (nodes[w].type == NODE_TYPE_CPU) {
+                        ((RGBA_t *)assign_col_legend_texture_raw)[i + assign_col_legend_w * j] = cur_col;
+                    } else {
+                        if (((i + j) % (2 * stripe_size) + (2 * stripe_size)) % (2 * stripe_size) < 2 * stripe_size / 3) {
+                            ((RGBA_t *)assign_col_legend_texture_raw)[i + assign_col_legend_w * j] = comp_col;
+                        } else {
+                            ((RGBA_t *)assign_col_legend_texture_raw)[i + assign_col_legend_w * j] = cur_col;
+                        }
+                    }
                 }
             }
 
