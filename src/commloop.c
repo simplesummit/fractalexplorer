@@ -83,7 +83,7 @@ void master_loop() {
     // float packed diagnostics information
     // sent: temperature (dummy rn), time_cmopute, time_compress
     float ** recv_diagnostics = (float **)malloc(sizeof(float *) * world_size);
-    unsigned char ** uncompressed_workloads = (char **)malloc(sizeof(char *) * world_size);
+    unsigned char ** uncompressed_workloads = (unsigned char **)malloc(sizeof(unsigned char *) * world_size);
 
     int compress_bound = LZ4_compressBound(3 * fractal_params.width * fractal_params.height);
 

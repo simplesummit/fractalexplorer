@@ -19,6 +19,11 @@ int fractal_type_idx = 0;
 #define ASSIGN_ALLCPU 1
 #define ASSIGN_ALLGPU 2
 
+#define ASSIGN_FIRSTGPU 3
+
+
+#define ASSIGN_RATIO_1GPU_1CPU 4
+
 int node_assign_pattern = ASSIGN_ALLCPU;
 
 int world_size, world_rank;
@@ -129,7 +134,12 @@ int main(int argc, char ** argv) {
                     node_assign_pattern = ASSIGN_ALLCPU;
                 } else if (strcmp(optarg, "ALLGPU") == 0) {
                     node_assign_pattern = ASSIGN_ALLGPU;
+                } else if (strcmp(optarg, "FIRSTGPU") == 0) {
+                    node_assign_pattern = ASSIGN_FIRSTGPU;
+                } else if (strcmp(optarg, "RATIO_1GPU_1CPU") == 0) {
+                    node_assign_pattern = ASSIGN_RATIO_1GPU_1CPU;
                 } else {
+
                     log_error("unknown assign type: %s", optarg);
                     return 1;
                 }
@@ -273,6 +283,12 @@ int main(int argc, char ** argv) {
                 nodes[i].type = NODE_TYPE_CPU;
             } else if (node_assign_pattern == ASSIGN_ALLGPU) {
                 nodes[i].type = NODE_TYPE_GPU;
+            } else if (node_assign_pattern == ASSIGN_FIRSTGPU) {
+                if (i == 1) nodes[i].type = NODE_TYPE_GPU;
+                else nodes[i].type = NODE_TYPE_CPU;
+            } else if (node_assign_pattern == ASSIGN_RATIO_1GPU_1CPU) {
+                if (i % 2 == 1) nodes[i].type = NODE_TYPE_GPU;
+                else nodes[i].type = NODE_TYPE_CPU;
             }
 
             // tell the node what type they are

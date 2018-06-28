@@ -102,6 +102,10 @@ __global__ void _engine_cuda_kernel(fractal_params_t frp, int color_scheme_len, 
     }
     int px = assigned_cols[col_index], py = blockIdx.y * blockDim.y + threadIdx.y;
 
+    if (px >= frp.width || py >= frp.height) {
+        return; //printf("ILLEGAL INDEX\n");
+    }
+
 
     double c_r = X_PIXEL_TO_RE(px, frp.width, frp.height, frp.center_r, frp.zoom);
     double c_i = Y_PIXEL_TO_IM(py, frp.width, frp.height, frp.center_i, frp.zoom);
@@ -155,7 +159,7 @@ __global__ void _engine_cuda_kernel(fractal_params_t frp, int color_scheme_len, 
 // returns 3byte packed pixels of successive rows, and stores the number of iterations for each column in output_iters
 void engine_cuda_compute(workload_t workload, unsigned char * output, int * output_iters) {
 
-    dim3 d_block(16, 16);
+    dim3 d_block(16, 12);
     dim3 d_grid;
     d_grid.x = (workload.assigned_cols_len + d_block.x - 1) / d_block.x;
     d_grid.y = (fractal_params.height + d_block.y - 1) / d_block.y;
