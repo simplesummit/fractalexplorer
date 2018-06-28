@@ -220,15 +220,15 @@ __global__ void _engine_cuda_kernel(fractal_params_t frp, int color_scheme_len, 
         partial_iteration = 3 + iter - log(log(z_r2 + z_i2)) / log(2.0);
     } else if (frp.type == FRACTAL_TYPE_MULTIBROT) {
 
-        cuComplex z = ccreate(z_r, z_i);
-        cuComplex c = ccreate(c_r, c_i);
-        cuComplex q = ccreate(q_r, q_i);
+        cuDoubleComplex z = ccreate(z_r, z_i);
+        cuDoubleComplex c = ccreate(c_r, c_i);
+        cuDoubleComplex q = ccreate(q_r, q_i);
 
         for (iter = 0; iter < frp.max_iter && cuCabs(z) <= 16.0; ++iter) {
-            z = cuCpow(z, q) + c;
+            z = cuCadd(cuCpow(z, q), c);
         }
 
-        partial_iteration = 3 + iter - log(log(z_r2 + z_i2)) / log(cuCabs(q));
+        partial_iteration = 2 + iter - log(log(cuCabs(z))) / log(cuCabs(q));
     } else if (frp.type == FRACTAL_TYPE_JULIA) {
         z_r2 = z_r * z_r;
         z_i2 = z_i * z_i;
