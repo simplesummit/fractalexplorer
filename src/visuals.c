@@ -139,8 +139,8 @@ void visuals_init() {
     assign_col_graph_texture_raw = malloc(4 * assign_col_graph_w * assign_col_graph_h);
 
 
-#define LEGEND_TEXT_SCALE 0.8
-    assign_col_legend_w = (int)floor(font_size * 3.6 * LEGEND_TEXT_SCALE);
+#define LEGEND_TEXT_SCALE 1.0
+    assign_col_legend_w = (int)floor(font_size * 4.2 * LEGEND_TEXT_SCALE);
     assign_col_legend_h = (int)floor((world_size - 1) * font_size * LEGEND_TEXT_SCALE);
 
     assign_col_legend_texture = SDL_CreateTexture(renderer, PIXEL_FORMAT, SDL_TEXTUREACCESS_STREAMING, assign_col_legend_w, assign_col_legend_h);
@@ -353,14 +353,18 @@ void visuals_update(unsigned char * fractal_pixels) {
             cur_col.A = 200;
             for (i = 0; i < assign_col_legend_w; ++i) {
                 for (j = (int)floor((w-1) * font_size * LEGEND_TEXT_SCALE); j < (int)floor(w * font_size * LEGEND_TEXT_SCALE); ++j) {
-                    if (nodes[w].type == NODE_TYPE_CPU) {
-                        ((RGBA_t *)assign_col_legend_texture_raw)[i + assign_col_legend_w * j] = cur_col;
-                    } else {
-                        if (((i + j) % (2 * stripe_size) + (2 * stripe_size)) % (2 * stripe_size) < 2 * stripe_size / 3) {
-                            ((RGBA_t *)assign_col_legend_texture_raw)[i + assign_col_legend_w * j] = comp_col;
-                        } else {
+                    if (i > assign_col_legend_w - font_size * LEGEND_TEXT_SCALE * 1.25) {
+                        if (nodes[w].type == NODE_TYPE_CPU) {
                             ((RGBA_t *)assign_col_legend_texture_raw)[i + assign_col_legend_w * j] = cur_col;
+                        } else {
+                            if (((i + j) % (2 * stripe_size) + (2 * stripe_size)) % (2 * stripe_size) < 2 * stripe_size / 3) {
+                                ((RGBA_t *)assign_col_legend_texture_raw)[i + assign_col_legend_w * j] = comp_col;
+                            } else {
+                                ((RGBA_t *)assign_col_legend_texture_raw)[i + assign_col_legend_w * j] = cur_col;
+                            }
                         }
+                    } else {
+                        ((RGBA_t *)assign_col_legend_texture_raw)[i + assign_col_legend_w * j].A = 0;
                     }
                 }
             }
@@ -501,12 +505,22 @@ void visuals_update(unsigned char * fractal_pixels) {
     SDL_RenderCopy(renderer, assign_col_legend_texture, NULL, &assign_legend_dst_rect);
 
     int w;
+    int num_cpus = 0;
+    int num_gpus = 0;
     for (w = 1; w < world_size; ++w) {
 
         SDL_Color text_color = { 0, 0, 0, 255 };
 
-        sprintf(info_graph_messages[1], "Node #%d", w);
-        FC_DrawScaleColor(font, renderer, assign_legend_dst_rect.x, assign_legend_dst_rect.y + (w-1) * font_size * LEGEND_TEXT_SCALE, FC_MakeScale(LEGEND_TEXT_SCALE, LEGEND_TEXT_SCALE), text_color, info_graph_messages[1]);
+        if (nodes[w].type == NODE_TYPE_CPU) {
+            num_cpus++;
+            sprintf(info_graph_messages[1], "CPU: #%d", w);
+        } else {
+            num_gpus++;
+            sprintf(info_graph_messages[1], "GPU: #%d", w);
+        }
+
+
+        FC_DrawScaleColor(font, renderer, assign_legend_dst_rect.x + font_size * LEGEND_TEXT_SCALE * (0.125 + 0.5), assign_legend_dst_rect.y + (w-1) * font_size * LEGEND_TEXT_SCALE, FC_MakeScale(LEGEND_TEXT_SCALE, LEGEND_TEXT_SCALE), text_color, info_graph_messages[1]);
     }
 
 
