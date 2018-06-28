@@ -279,25 +279,15 @@ void master_loop() {
             }
         }
 
-        MPI_Bcast(&fractal_params, 1, mpi_params_type, 0, MPI_COMM_WORLD);
-
-        int node_workload_size;
-        for (i = 1; i < world_size; ++i) {
-            send_workload(node_workloads[i], i);
-
-            node_workload_size = 3 * fractal_params.height * node_workloads[i].assigned_cols_len;
-
-            MPI_Irecv(node_results_recv[i], LZ4_compressBound(node_workload_size), MPI_UNSIGNED_CHAR, i, 0, MPI_COMM_WORLD, &recv_requests[i]);
-            MPI_Irecv(recv_col_iters[i], node_workloads[i].assigned_cols_len, MPI_INT, i, 0, MPI_COMM_WORLD, &col_iters_recv_requests[i]);
-            MPI_Irecv(recv_diagnostics[i], 5, MPI_FLOAT, i, 0, MPI_COMM_WORLD, &diagnostics_recv_requests[i]);
-        }
 
         tperf_end(assigning_perf);
         diagnostics_history[diagnostics_history_idx].time_assign = assigning_perf.elapsed_s;
 
+
+        MPI_Bcast(&fractal_params, 1, mpi_params_type, 0, MPI_COMM_WORLD);
+
+
         /* FREE COMPUTE TIME WHILE WAITING FOR Irecv's to go through */
-
-
 
         // we could do all the visual stuff one frame behind
 
@@ -374,7 +364,23 @@ void master_loop() {
         diagnostics_history[diagnostics_history_idx].time_control_update = control_update_perf.elapsed_s;
         
 
+
         tperf_start(waiting_perf);
+
+        int node_workload_size;
+        for (i = 1; i < world_size; ++i) {
+            send_workload(node_workloads[i], i);
+
+            node_workload_size = 3 * fractal_params.height * node_workloads[i].assigned_cols_len;
+            int cur_rec_size;
+            MPI_Recv(&cur_rec_size, 1, MPI_INT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            
+
+            MPI_Irecv(node_results_recv[i], cur_rec_size, MPI_UNSIGNED_CHAR, i, 0, MPI_COMM_WORLD, &recv_requests[i]);
+            MPI_Irecv(recv_col_iters[i], node_workloads[i].assigned_cols_len, MPI_INT, i, 0, MPI_COMM_WORLD, &col_iters_recv_requests[i]);
+            MPI_Irecv(recv_diagnostics[i], 5, MPI_FLOAT, i, 0, MPI_COMM_WORLD, &diagnostics_recv_requests[i]);
+        }
+
 
         MPI_Waitall(world_size-1, recv_requests + 1, recv_statuses + 1);
         MPI_Waitall(world_size-1, diagnostics_recv_requests + 1, MPI_STATUSES_IGNORE);
@@ -437,15 +443,21 @@ void master_loop() {
         */
         //printf("%f, max differential: %%%f\n", max_time, 100.0 * differential);
 
-        /*
 
-        float longest_compute_time = 0.0f;
+
+        /*
+        double fastest_transfer = INFINITY;
         int k;
         for (k = 1; k < world_size; ++k) {
-            if (recv_diagnostics[k][1] > longest_compute_time) {
-                longest_compute_time = recv_diagnostics[k][1];
+
+            double cur_tr = (double)prev_node_results_len[k] / (double)recv_diagnostics[k][4];
+            if (cur_tr < fastest_transfer) {
+                fastest_transfer = cur_tr;
             }
         }
+
+        log_debug("slowest speed: %lf Mb/s", fastest_transfer / (1024.0 * 1024.0));
+
         */
 
 
@@ -552,7 +564,6 @@ void slave_loop() {
         tperf_start(compute_perf);        
 
         #ifdef HAVE_CUDA
-            log_debug("GPU run");
         if (this_node.type == NODE_TYPE_CPU) {
             engine_c_compute(my_workload, my_result, my_result_iters);
         } else if (this_node.type == NODE_TYPE_GPU) {
@@ -572,6 +583,7 @@ void slave_loop() {
             tperf_end(compress_perf);
 
             tperf_start(io_perf);
+            MPI_Send(&compressed_size, 1, MPI_INT, 0, 0, MPI_COMM_WORLD); 
             MPI_Send(my_compressed_buffer, compressed_size, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
             tperf_end(io_perf);
         } else {
@@ -580,6 +592,7 @@ void slave_loop() {
             tperf_end(compress_perf);
 
             tperf_start(io_perf);
+            MPI_Send(&my_result_size, 1, MPI_INT, 0, 0, MPI_COMM_WORLD); 
             MPI_Send(my_result, my_result_size, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
             tperf_end(io_perf);
         }

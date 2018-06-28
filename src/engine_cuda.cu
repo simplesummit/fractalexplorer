@@ -251,14 +251,21 @@ __global__ void _engine_cuda_kernel(fractal_params_t frp, int color_scheme_len, 
     int after_idx = (before_idx + 1) % color_scheme_len;
 
     RGB_t color_before = ((RGB_t *)color_scheme)[before_idx];
-    RGB_t color_after = ((RGB_t *)color_scheme)[after_idx];
-
     
     RGB_t color;
 
-    color.R = lin_mix(color_before.R, color_after.R, gradient);
-    color.G = lin_mix(color_before.G, color_after.G, gradient);
-    color.B = lin_mix(color_before.B, color_after.B, gradient);
+
+    if (frp.flags & FRACTAL_FLAG_GRADIENT) {
+        RGB_t color_after = ((RGB_t *)color_scheme)[after_idx];
+        color.R = lin_mix(color_before.R, color_after.R, gradient);
+        color.G = lin_mix(color_before.G, color_after.G, gradient);
+        color.B = lin_mix(color_before.B, color_after.B, gradient);
+    } else {
+        color.R = color_before.R;
+        color.G = color_before.G;
+        color.B = color_before.B;
+    }
+
 
     ((RGB_t *)output)[frp.height * col_index + py] = color;
     result_iters[frp.height * col_index + py] = iter;

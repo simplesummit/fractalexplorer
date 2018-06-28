@@ -155,12 +155,21 @@ void engine_c_compute(workload_t workload, unsigned char * output, int * output_
             int after_idx = (before_idx + 1) % color_scheme.len;
 
             col_before = _local_color_scheme[before_idx];
-            col_after = _local_color_scheme[after_idx];
 
-            // mix them
-            cur_color.R = lin_mix(col_before.R, col_after.R, gradient);
-            cur_color.G = lin_mix(col_before.G, col_after.G, gradient);
-            cur_color.B = lin_mix(col_before.B, col_after.B, gradient);
+
+            if (fractal_params.flags & FRACTAL_FLAG_GRADIENT) {
+                col_after = _local_color_scheme[after_idx];
+		// mix them
+		cur_color.R = lin_mix(col_before.R, col_after.R, gradient);
+		cur_color.G = lin_mix(col_before.G, col_after.G, gradient);
+		cur_color.B = lin_mix(col_before.B, col_after.B, gradient);
+	    } else {
+                cur_color.R = col_before.R;
+                cur_color.G = col_before.G;
+                cur_color.B = col_before.B;
+            }
+
+
 
             _output_rgb[output_idx] = cur_color;
         }

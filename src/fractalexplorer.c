@@ -21,8 +21,11 @@ int fractal_type_idx = 0;
 
 #define ASSIGN_FIRSTGPU 3
 
-
 #define ASSIGN_RATIO_1GPU_1CPU 4
+
+#define ASSIGN_RATIO_1GPU_5CPU 5
+
+#define ASSIGN_RATIO_2GPU_4CPU 6
 
 int node_assign_pattern = ASSIGN_ALLCPU;
 
@@ -71,7 +74,7 @@ int main(int argc, char ** argv) {
     fractal_params.height = 480;
     fractal_params.max_iter = 125;
     fractal_params.type = FRACTAL_TYPE_MANDELBROT;
-    fractal_params.flags = FRACTAL_FLAG_USE_COMPRESSION;
+    fractal_params.flags = FRACTAL_FLAG_USE_COMPRESSION;// | FRACTAL_FLAG_GRADIENT;
     fractal_params.center_r = 0.0;//0.2821;
     fractal_params.center_i = 0.0;//0.01;
     fractal_params.q_r = 0.0;
@@ -148,6 +151,10 @@ int main(int argc, char ** argv) {
                     node_assign_pattern = ASSIGN_FIRSTGPU;
                 } else if (strcmp(optarg, "RATIO_1GPU_1CPU") == 0) {
                     node_assign_pattern = ASSIGN_RATIO_1GPU_1CPU;
+                } else if (strcmp(optarg, "RATIO_1GPU_5CPU") == 0) {
+                    node_assign_pattern = ASSIGN_RATIO_1GPU_5CPU;
+                } else if (strcmp(optarg, "RATIO_2GPU_4CPU") == 0) {
+                    node_assign_pattern = ASSIGN_RATIO_2GPU_4CPU;
                 } else {
 
                     log_error("unknown assign type: %s", optarg);
@@ -297,7 +304,13 @@ int main(int argc, char ** argv) {
                 if (i == 1) nodes[i].type = NODE_TYPE_GPU;
                 else nodes[i].type = NODE_TYPE_CPU;
             } else if (node_assign_pattern == ASSIGN_RATIO_1GPU_1CPU) {
-                if (i % 2 == 1) nodes[i].type = NODE_TYPE_GPU;
+                if (i % 2 == 0) nodes[i].type = NODE_TYPE_GPU;
+                else nodes[i].type = NODE_TYPE_CPU;
+            } else if (node_assign_pattern == ASSIGN_RATIO_1GPU_5CPU) {
+                if (i % 6 == 0) nodes[i].type = NODE_TYPE_GPU;
+                else nodes[i].type = NODE_TYPE_CPU;
+            } else if (node_assign_pattern == ASSIGN_RATIO_2GPU_4CPU) {
+                if (i % 6 < 2) nodes[i].type = NODE_TYPE_GPU;
                 else nodes[i].type = NODE_TYPE_CPU;
             }
 
