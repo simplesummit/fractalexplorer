@@ -320,7 +320,7 @@ void visuals_update(unsigned char * fractal_pixels) {
 
 
             while (k < assign_col_graph_h) {
-                if (nodes[w].type == NODE_TYPE_CPU) {
+                if (nodes[last_diagnostics.node_assignments[i]].type == NODE_TYPE_CPU) {
                     ((RGBA_t *)assign_col_graph_texture_raw)[assign_col_graph_w * k + i] = col_color;
                 } else {
                     if (((k + i) % (2 * stripe_size) + (2 * stripe_size)) % (2 * stripe_size) < 2 * stripe_size / 3) {
