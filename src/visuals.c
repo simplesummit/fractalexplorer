@@ -11,6 +11,14 @@
 //#endif
 
 
+#if SDL_BYTEORDER == SDL_BIG_ENDIAN
+    #define PIXEL_FORMAT SDL_PIXELFORMAT_RGBA8888
+#else
+    #define PIXEL_FORMAT SDL_PIXELFORMAT_ABGR8888
+#endif
+
+
+
 // main stuff
 SDL_Window * window;
 SDL_Renderer * renderer;
@@ -101,7 +109,7 @@ void visuals_init() {
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
-    SDL_SetRenderDrawBlendMode(renderer, overlay_mode);
+    //SDL_SetRenderDrawBlendMode(renderer, overlay_mode);
 
     SDL_RenderClear(renderer);
     SDL_RenderPresent(renderer);
@@ -122,7 +130,7 @@ void visuals_init() {
     assign_col_graph_w = fractal_params.width;
     assign_col_graph_h = fractal_params.height / 5;
 
-    assign_col_graph_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, assign_col_graph_w, assign_col_graph_h);
+    assign_col_graph_texture = SDL_CreateTexture(renderer, PIXEL_FORMAT, SDL_TEXTUREACCESS_STREAMING, assign_col_graph_w, assign_col_graph_h);
     if (assign_col_graph_texture == NULL) {
         log_fatal("Fail on SDL_CreateTexture(): %s", SDL_GetError());
         M_EXIT(1);
@@ -135,7 +143,7 @@ void visuals_init() {
     assign_col_legend_w = (int)floor(font_size * 3.6 * LEGEND_TEXT_SCALE);
     assign_col_legend_h = (int)floor((world_size - 1) * font_size * LEGEND_TEXT_SCALE);
 
-    assign_col_legend_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, assign_col_legend_w, assign_col_legend_h);
+    assign_col_legend_texture = SDL_CreateTexture(renderer, PIXEL_FORMAT, SDL_TEXTUREACCESS_STREAMING, assign_col_legend_w, assign_col_legend_h);
     if (assign_col_legend_texture == NULL) {
         log_fatal("Fail on SDL_CreateTexture(): %s", SDL_GetError());
         M_EXIT(1);
@@ -149,7 +157,7 @@ void visuals_init() {
     info_graph_texture_xoff = font_size / 2;
     info_graph_texture_yoff = font_size / 4;
 
-    info_graph_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, info_graph_w, info_graph_h);
+    info_graph_texture = SDL_CreateTexture(renderer, PIXEL_FORMAT, SDL_TEXTUREACCESS_STREAMING, info_graph_w, info_graph_h);
     if (info_graph_texture == NULL) {
         log_fatal("Fail on SDL_CreateTexture(): %s", SDL_GetError());
         M_EXIT(1);
@@ -178,7 +186,7 @@ void visuals_init() {
     performance_graph_w = 12 * font_size;
     performance_graph_h = 27 * font_size / 4;
 
-    performance_graph_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, performance_graph_w, performance_graph_h);
+    performance_graph_texture = SDL_CreateTexture(renderer, PIXEL_FORMAT, SDL_TEXTUREACCESS_STREAMING, performance_graph_w, performance_graph_h);
     if (performance_graph_texture == NULL) {
         log_fatal("Fail on SDL_CreateTexture(): %s", SDL_GetError());
         M_EXIT(1);
