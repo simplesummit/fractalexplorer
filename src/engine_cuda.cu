@@ -36,16 +36,102 @@ inline void gpuAssert(cudaError_t code, const char *file, int line) {
        //    exit(code);
        //}
     }
- }
+}
 
 
+/*
+
+GPU complex library extension
+
+*/
 
 
-//#include "engine_c.h"
-//#include "fractalexplorer.h"
+#define creal(a) a.x
+#define cimag(a) a.y
+#define cabs(a) hypot(a.x, a.y)
+#define carg(a) atan2(a.y, a.x)
 
-//#include "math.h"
-//#include "complex.h"
+
+// the squared abs, i.e. cabs(a) * cabs(a)
+#define cabs2(a) (a.x*a.x+a.y*a.y)
+
+// constructor
+#define ccreate(x, y) ((cuDoubleComplex){ (x), (y) })
+
+// pow, returns e**(x)
+__host__ __device__ static __inline__
+cuDoubleComplex cuCexp(cuDoubleComplex x) {
+    cuDoubleComplex result = { 0.0, 0.0 };
+    double tmp_scale = exp(x.x);
+    sincos(x.y, &result.y, &result.x);
+    result.x *= tmp_scale;
+    result.y *= tmp_scale;
+    return result;
+}
+
+// 1 / x
+__host__ __device__ static __inline__
+cuDoubleComplex cuCrec(cuDoubleComplex x) {
+    double to_scale = cabs2(x);
+    return ccreate(x.x / to_scale, -x.y / to_scale);
+}
+
+// natural logarithm, base e ~= 2.71828
+__host__ __device__ static __inline__
+cuDoubleComplex cuClog(cuDoubleComplex x) {
+    return ccreate(log(cabs2(x)) / 2.0, atan2(x.y, x.x));
+}
+
+// log_y(x), or log base y of x
+__host__ __device__ static __inline__
+cuDoubleComplex cuClogb(cuDoubleComplex x, cuDoubleComplex y) {
+    return cuCdiv(cuClog(x), cuClog(y));
+}
+
+// x * x, or x ** 2, x squared
+__host__ __device__ static __inline__
+cuDoubleComplex cuCsqr(cuDoubleComplex x) {
+    return ccreate(x.x*x.x - x.y*x.y, 2 * x.x*x.y);
+}
+
+// x ** y, but optimized for integers
+__host__ __device__ static __inline__
+cuDoubleComplex cuCpowi(cuDoubleComplex x, int y) {
+    bool is_neg_pow = y < 0;
+    y = abs(y);
+    // holds track of x^{2^{exp bit}}
+    cuDoubleComplex xt2eb = x, result = ccreate(1, 0);
+    while (y > 0) {
+        if (y & 1) {
+            result = cuCmul(result, xt2eb);
+        }
+        xt2eb = cuCsqr(xt2eb);
+        y >>= 1;
+    }
+    return (is_neg_pow) ? cuCrec(result) : result;
+}
+
+
+// x ** y, or x to the y power
+__host__ __device__ static __inline__
+cuDoubleComplex cuCpow(cuDoubleComplex x, cuDoubleComplex y) {
+    return cuCexp(cuCmul(cuClog(x), y));
+}
+
+// sin, returns sin(x). Highly optimized method
+// correct for all complex numbers
+__host__ __device__ static __inline__
+cuDoubleComplex cuCsin(cuDoubleComplex x) {
+    return ccreate(sin(x.x) * cosh(x.y), cos(x.x) * sinh(x.y));
+}
+
+
+// cos, returns cos(x). Highly optimized and
+// works for complex numbers
+__host__ __device__ static __inline__
+cuDoubleComplex cuCcos(cuDoubleComplex x) {
+    return ccreate(cos(x.x) * cosh(x.y), -sin(x.x) * sinh(x.y));
+}
 
 
 struct {
@@ -114,6 +200,8 @@ __global__ void _engine_cuda_kernel(fractal_params_t frp, int color_scheme_len, 
 
     double z_r2, z_i2;
 
+    double q_r = frp.q_r, q_i = frp.q_i;
+
     // stuff for colorization
     int iter = 0;
     double partial_iteration;
@@ -130,6 +218,28 @@ __global__ void _engine_cuda_kernel(fractal_params_t frp, int color_scheme_len, 
             z_i2 = z_i * z_i;
         }
         partial_iteration = 3 + iter - log(log(z_r2 + z_i2)) / log(2.0);
+    } else if (frp.type == FRACTAL_TYPE_MULTIBROT) {
+
+        cuComplex z = ccreate(z_r, z_i);
+        cuComplex c = ccreate(c_r, c_i);
+        cuComplex q = ccreate(q_r, q_i);
+
+        for (iter = 0; iter < frp.max_iter && cuCabs(z) <= 16.0; ++iter) {
+            z = cuCpow(z, q) + c;
+        }
+
+        partial_iteration = 3 + iter - log(log(z_r2 + z_i2)) / log(cuCabs(q));
+    } else if (frp.type == FRACTAL_TYPE_JULIA) {
+        z_r2 = z_r * z_r;
+        z_i2 = z_i * z_i;
+
+        for (iter = 0; iter < frp.max_iter && z_r2 + z_i2 <= 256.0; ++iter) {
+            z_i = 2 * z_r * z_i + q_i;
+            z_r = z_r2 - z_i2 + q_r;
+            z_r2 = z_r * z_r;
+            z_i2 = z_i * z_i;
+        }
+        partial_iteration = 3 + iter - log(log(z_r2 + z_i2)) / log(2.0); 
     }
 
     double idx_final = partial_iteration;
