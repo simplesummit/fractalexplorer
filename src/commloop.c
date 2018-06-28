@@ -543,8 +543,18 @@ void slave_loop() {
         recv_workload(&my_workload);
 
         tperf_start(compute_perf);        
+
+        #ifdef HAVE_CUDA
+            log_debug("GPU run");
+        if (this_node.type == NODE_TYPE_CPU) {
+            engine_c_compute(my_workload, my_result, my_result_iters);
+        } else if (this_node.type == NODE_TYPE_GPU) {
+            engine_cuda_compute(my_workload, my_result, my_result_iters);
+        }
+        #else
         engine_c_compute(my_workload, my_result, my_result_iters);
-        //engine_cuda_compute(my_workload, my_result, my_result_iters);
+        #endif
+
         tperf_end(compute_perf);
 
         my_result_size = 3 * fractal_params.height * my_workload.assigned_cols_len;

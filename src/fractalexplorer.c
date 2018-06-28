@@ -15,6 +15,12 @@ node_t this_node;
 fractal_type_t * fractal_types;
 int fractal_type_idx = 0;
 
+
+#define ASSIGN_ALLCPU 1
+#define ASSIGN_ALLGPU 2
+
+int node_assign_pattern = ASSIGN_ALLCPU;
+
 int world_size, world_rank;
 
 char processor_name[MPI_MAX_PROCESSOR_NAME];
@@ -79,22 +85,26 @@ int main(int argc, char ** argv) {
     fractal_types[2].name = strdup("Julia");
     fractal_types[2].equation = strdup("z^2+q");
 
+
+
     // parsing arguments
 
     // if it is -1000, let it pass
     int exit_code = -1000;
 
     if (world_rank == 0) {
+
         char c;
 
         char * color_scheme_path = NULL;
 
-        while ((c = getopt(argc, argv, "v:q:s:c:z:i:Fh")) != (char)(-1)) {
+        while ((c = getopt(argc, argv, "v:q:s:c:z:i:A:Fh")) != (char)(-1)) {
             switch (c) {
             case 'h':
                 printf("Usage: fractal explorer [-h] [-v VERBOSE]\n");
                 printf("  -h                 help menu\n");
                 printf("  -v [N]             set verbosity (1=error only ... 5=trace)\n");
+                printf("  -A [LABEL]         How to assign work (ALLCPU, ALLGPU)\n");
                 printf("  -c [a+bi]          set the starting center point\n");
                 printf("  -q [a+bi]          set q parameter start\n");
                 printf("  -z [f]             set the starting zoom\n");
@@ -112,6 +122,16 @@ int main(int argc, char ** argv) {
                     } else {
                         printf("Warning: setting verbosity failed\n");
                     }
+                }
+                break;
+            case 'A':
+                if (strcmp(optarg, "ALLCPU") == 0) {
+                    node_assign_pattern = ASSIGN_ALLCPU;
+                } else if (strcmp(optarg, "ALLGPU") == 0) {
+                    node_assign_pattern = ASSIGN_ALLGPU;
+                } else {
+                    log_error("unknown assign type: %s", optarg);
+                    return 1;
                 }
                 break;
             case 'c':
@@ -143,6 +163,18 @@ int main(int argc, char ** argv) {
                 break;
             }
         }
+
+
+        #ifdef HAVE_CUDA
+        log_info("Compiled with CUDA support");
+
+        #else
+
+        if (node_assign_pattern == ASSIGN_ALLGPU) {
+            log_warn("ALLGPU was used as assign pattern, but not compiled with CUDA support! falling back to C");
+        }
+        #endif
+
 
         if (color_scheme_path == NULL) {
             
@@ -222,18 +254,25 @@ int main(int argc, char ** argv) {
             nodes[i].processor_name = strdup(_tmp_recv_processor_name);            
 
 
-            cur_proc_gpus_assigned = 0;
 
-            for (j = 1; j < i; ++j) {
-                if (strcmp(nodes[j].processor_name, nodes[i].processor_name) == 0 && nodes[j].type == NODE_TYPE_GPU) {
-                    cur_proc_gpus_assigned++;
+            if (false) { // TODO: 1 gpu per node
+                cur_proc_gpus_assigned = 0;
+
+                for (j = 1; j < i; ++j) {
+                    if (strcmp(nodes[j].processor_name, nodes[i].processor_name) == 0 && nodes[j].type == NODE_TYPE_GPU) {
+                        cur_proc_gpus_assigned++;
+                    }
                 }
-            }
 
-            if (cur_proc_gpus_assigned < GPUs_per_proc) {
-                nodes[i].type = NODE_TYPE_GPU;
-            } else {
+                if (cur_proc_gpus_assigned < GPUs_per_proc) {
+                    nodes[i].type = NODE_TYPE_GPU;
+                } else {
+                    nodes[i].type = NODE_TYPE_CPU;
+                }
+            } else if (node_assign_pattern == ASSIGN_ALLCPU) {
                 nodes[i].type = NODE_TYPE_CPU;
+            } else if (node_assign_pattern == ASSIGN_ALLGPU) {
+                nodes[i].type = NODE_TYPE_GPU;
             }
 
             // tell the node what type they are
