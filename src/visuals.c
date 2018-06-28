@@ -118,7 +118,7 @@ void visuals_init() {
 
     font_size = 6 + fractal_params.width / 60;
     font = FC_CreateFont();
-    FC_LoadFont(font, renderer, "./UbuntuMono.ttf", font_size, FC_MakeColor(0, 0, 0, 255), TTF_STYLE_NORMAL);
+    FC_LoadFont(font, renderer, font_path, font_size, FC_MakeColor(0, 0, 0, 255), TTF_STYLE_NORMAL);
 
 
     texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, fractal_params.width, fractal_params.height);
@@ -353,7 +353,7 @@ void visuals_update(unsigned char * fractal_pixels) {
             cur_col.A = 200;
             for (i = 0; i < assign_col_legend_w; ++i) {
                 for (j = (int)floor((w-1) * font_size * LEGEND_TEXT_SCALE); j < (int)floor(w * font_size * LEGEND_TEXT_SCALE); ++j) {
-                    if (i > assign_col_legend_w - font_size * LEGEND_TEXT_SCALE * 1.25) {
+                    if (i > assign_col_legend_w - font_size * LEGEND_TEXT_SCALE * 1.75) {
                         if (nodes[w].type == NODE_TYPE_CPU) {
                             ((RGBA_t *)assign_col_legend_texture_raw)[i + assign_col_legend_w * j] = cur_col;
                         } else {
@@ -513,14 +513,14 @@ void visuals_update(unsigned char * fractal_pixels) {
 
         if (nodes[w].type == NODE_TYPE_CPU) {
             num_cpus++;
-            sprintf(info_graph_messages[1], "CPU: #%d", w);
+            sprintf(info_graph_messages[1], "    #%2d", w);
         } else {
             num_gpus++;
-            sprintf(info_graph_messages[1], "GPU: #%d", w);
+            sprintf(info_graph_messages[1], "    #%2d", w);
         }
 
 
-        FC_DrawScaleColor(font, renderer, assign_legend_dst_rect.x + font_size * LEGEND_TEXT_SCALE * (0.125 + 0.5), assign_legend_dst_rect.y + (w-1) * font_size * LEGEND_TEXT_SCALE, FC_MakeScale(LEGEND_TEXT_SCALE, LEGEND_TEXT_SCALE), text_color, info_graph_messages[1]);
+        FC_DrawScaleColor(font, renderer, assign_legend_dst_rect.x + font_size * LEGEND_TEXT_SCALE * (0.5 + 0.125), assign_legend_dst_rect.y + (w-1) * font_size * LEGEND_TEXT_SCALE, FC_MakeScale(LEGEND_TEXT_SCALE, LEGEND_TEXT_SCALE), text_color, info_graph_messages[1]);
     }
 
 

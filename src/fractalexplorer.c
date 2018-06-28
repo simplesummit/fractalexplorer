@@ -28,6 +28,8 @@ int node_assign_pattern = ASSIGN_ALLCPU;
 
 int world_size, world_rank;
 
+char * font_path = NULL;
+
 char processor_name[MPI_MAX_PROCESSOR_NAME];
 int processor_name_len;
 
@@ -76,6 +78,8 @@ int main(int argc, char ** argv) {
     fractal_params.q_i = 0.0;
     fractal_params.zoom = 1;//100
 
+    font_path = "./UbuntuMono.ttf";
+
     fractal_types = malloc(sizeof(fractal_type_t) * NUM_FRACTAL_TYPES);
 
     fractal_types[0].flag = FRACTAL_TYPE_MANDELBROT;
@@ -103,7 +107,9 @@ int main(int argc, char ** argv) {
 
         char * color_scheme_path = NULL;
 
-        while ((c = getopt(argc, argv, "v:q:s:c:z:i:A:Fh")) != (char)(-1)) {
+        log_info("world_size: %d", world_size);
+
+        while ((c = getopt(argc, argv, "v:q:s:c:z:i:A:T:Fh")) != (char)(-1)) {
             switch (c) {
             case 'h':
                 printf("Usage: fractal explorer [-h] [-v VERBOSE]\n");
@@ -115,6 +121,7 @@ int main(int argc, char ** argv) {
                 printf("  -z [f]             set the starting zoom\n");
                 printf("  -i [N]             set maximum iterations\n");
                 printf("  -s [WxH]           set screen size (0x0 for full screen)\n");
+                printf("  -T [font]          Font path\n");
                 printf("  -F                 full screen display\n");
                 printf("\n");
                 exit_code = 0;
@@ -128,6 +135,9 @@ int main(int argc, char ** argv) {
                         printf("Warning: setting verbosity failed\n");
                     }
                 }
+                break;
+            case 'T':
+                font_path = optarg;
                 break;
             case 'A':
                 if (strcmp(optarg, "ALLCPU") == 0) {

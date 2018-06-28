@@ -40,6 +40,8 @@ int world_size, world_rank;
 char processor_name[MPI_MAX_PROCESSOR_NAME];
 int processor_name_len;
 
+char * font_path;
+
 MPI_Datatype mpi_params_type;
 
 fractal_params_t fractal_params;
