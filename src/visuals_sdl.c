@@ -416,14 +416,14 @@ void visuals_sdl_update(unsigned char * fractal_pixels) {
             
 
             float compute_prop = max_compute_time / biggest_time;
-            float io_prop = cur_graph_diag.time_recombo;// + cur_graph_diag.time_;
+            float io_prop = cur_graph_diag.time_recombo + max_io_time;// + cur_graph_diag.time_;
             /*if (cur_graph_diag.time_wait < 0.01) {
                 // only count the recombo if it was waited on
                 io_prop += cur_graph_diag.time_recombo;
             }*/
 
             io_prop /= biggest_time;
-            float compress_prop = (cur_graph_diag.time_visuals + max_compress_time + cur_graph_diag.time_decompress) / biggest_time;
+            float compress_prop = (max_compress_time + cur_graph_diag.time_decompress) / biggest_time;
 
             float total_prop = cur_graph_diag.time_total / biggest_time;
 

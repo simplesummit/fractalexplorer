@@ -293,6 +293,26 @@ void master_loop() {
         MPI_Bcast(&fractal_params, 1, mpi_params_type, 0, MPI_COMM_WORLD);
 
 
+
+        for (i = 1; i < world_size; ++i) {
+            send_workload(node_workloads[i], i);
+
+            int node_workload_size = 4 * fractal_params.height * node_workloads[i].assigned_cols_len;
+            int cur_rec_size;
+
+           // tperf_start(tmpp[i]);
+            //MPI_Recv(&cur_rec_size, 1, MPI_INT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+           // tperf_end(tmpp[i]);
+
+            //waiting_perf.elapsed_s += tmp.elapsed_s;
+
+            MPI_Irecv(node_results_recv[i], LZ4_compressBound(node_workload_size), MPI_UNSIGNED_CHAR, i, 0, MPI_COMM_WORLD, &recv_requests[i]);
+            MPI_Irecv(recv_col_iters[i], node_workloads[i].assigned_cols_len, MPI_INT, i, 0, MPI_COMM_WORLD, &col_iters_recv_requests[i]);
+            MPI_Irecv(recv_diagnostics[i], 5, MPI_FLOAT, i, 0, MPI_COMM_WORLD, &diagnostics_recv_requests[i]);
+        }
+
+
+
         /* FREE COMPUTE TIME WHILE WAITING FOR Irecv's to go through */
 
         // we could do all the visual stuff one frame behind
@@ -316,15 +336,26 @@ void master_loop() {
 //#pragma omp parallel for
             for (k = 0; k < previous_node_workloads[i].assigned_cols_len; ++k) {
                 int col = previous_node_workloads[i].assigned_cols[k];
+                int start_k = k;
+                int n_workloads = 1;
+                while (k < previous_node_workloads[i].assigned_cols_len - 1 && previous_node_workloads[i].assigned_cols[k+1] == previous_node_workloads[i].assigned_cols[k] + 1) {
+                    k++;
+                    n_workloads++;
+                }
+
+                memcpy(((RGBA_t*)total_image_colmajor) + fractal_params.height * col, ((RGBA_t*)uncompressed_workloads[i]) + fractal_params.height * start_k, sizeof(RGBA_t) *  fractal_params.height * n_workloads);
+/*
                 int l;
                 for (l = 0; l < fractal_params.height; ++l) {
                     ((RGBA_t *)total_image_colmajor)[fractal_params.height * col + l] = ((RGBA_t *)uncompressed_workloads[i])[fractal_params.height * k + l];
                 }
+*/
             }
+
 
         }
           
-        
+
 #ifdef HAVE_CUDA
         cuda_colmajor_to_rowmajor((RGBA_t*)total_image_colmajor, (RGBA_t*)total_image);
 #else
@@ -333,8 +364,8 @@ void master_loop() {
         
 
         }
-
         tperf_end(recombo_perf);
+
         diagnostics_history[diagnostics_history_idx].time_recombo = recombo_perf.elapsed_s;
         
 
@@ -369,38 +400,14 @@ printf("visuals fps: %lf\n", 1.0 / visuals_perf.elapsed_s);
 
 
         tperf_start(waiting_perf);        
-        tperf_t *tmpp = (tperf_t *)malloc(world_size * sizeof(tperf_t));
 
-
-        tperf_end(waiting_perf);
-
-        for (i = 1; i < world_size; ++i) {
-            send_workload(node_workloads[i], i);
-
-            int node_workload_size = 4 * fractal_params.height * node_workloads[i].assigned_cols_len;
-            int cur_rec_size;
-
-            tperf_start(tmpp[i]);
-            //MPI_Recv(&cur_rec_size, 1, MPI_INT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            tperf_end(tmpp[i]);
-
-            //waiting_perf.elapsed_s += tmp.elapsed_s;
-
-            MPI_Irecv(node_results_recv[i], LZ4_compressBound(node_workload_size), MPI_UNSIGNED_CHAR, i, 0, MPI_COMM_WORLD, &recv_requests[i]);
-            MPI_Irecv(recv_col_iters[i], node_workloads[i].assigned_cols_len, MPI_INT, i, 0, MPI_COMM_WORLD, &col_iters_recv_requests[i]);
-            MPI_Irecv(recv_diagnostics[i], 5, MPI_FLOAT, i, 0, MPI_COMM_WORLD, &diagnostics_recv_requests[i]);
-        }
-
-
-        for (i = 1; i < world_size; ++i) {
-            waiting_perf.elapsed_s += tmpp[i].elapsed_s;
-        }
 
         MPI_Waitall(world_size-1, recv_requests + 1, recv_statuses + 1);
         MPI_Waitall(world_size-1, diagnostics_recv_requests + 1, MPI_STATUSES_IGNORE);
         MPI_Waitall(world_size-1, col_iters_recv_requests + 1, MPI_STATUSES_IGNORE);
 
 
+        tperf_end(waiting_perf);
 
         diagnostics_history[diagnostics_history_idx].time_wait = waiting_perf.elapsed_s;
         
