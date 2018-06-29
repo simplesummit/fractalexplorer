@@ -1,15 +1,23 @@
 
+/*
+
+This is the generic header file.
+
+These three functions are implemented in "visuals_sdl.c" and "visuals_glfw.c"
+
+But they are switched by visuals.c
+
+*/
 
 #ifndef __VISUALS_H__
 #define __VISUALS_H__
 
-#include "SDL.h"
 
-SDL_Window * window;
-SDL_Renderer * renderer;
-SDL_Surface * screen;
-SDL_Texture * texture;
+#define VISUALS_USE_SDL 0x0001
+#define VISUALS_USE_GLFW 0x0002
 
+
+int visuals_flag;
 
 void visuals_init();
 
