@@ -362,31 +362,42 @@ void master_loop() {
 
         tperf_end(control_update_perf);
         diagnostics_history[diagnostics_history_idx].time_control_update = control_update_perf.elapsed_s;
-        
 
 
-        tperf_start(waiting_perf);
+        tperf_start(waiting_perf);        
+        tperf_t *tmpp = (tperf_t *)malloc(world_size * sizeof(tperf_t));
 
-        int node_workload_size;
+
+        tperf_end(waiting_perf);
+
         for (i = 1; i < world_size; ++i) {
             send_workload(node_workloads[i], i);
 
-            node_workload_size = 3 * fractal_params.height * node_workloads[i].assigned_cols_len;
+            int node_workload_size = 3 * fractal_params.height * node_workloads[i].assigned_cols_len;
             int cur_rec_size;
-            MPI_Recv(&cur_rec_size, 1, MPI_INT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            
 
-            MPI_Irecv(node_results_recv[i], cur_rec_size, MPI_UNSIGNED_CHAR, i, 0, MPI_COMM_WORLD, &recv_requests[i]);
+            tperf_start(tmpp[i]);
+            //MPI_Recv(&cur_rec_size, 1, MPI_INT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            tperf_end(tmpp[i]);
+
+            //waiting_perf.elapsed_s += tmp.elapsed_s;
+
+            MPI_Irecv(node_results_recv[i], LZ4_compressBound(node_workload_size), MPI_UNSIGNED_CHAR, i, 0, MPI_COMM_WORLD, &recv_requests[i]);
             MPI_Irecv(recv_col_iters[i], node_workloads[i].assigned_cols_len, MPI_INT, i, 0, MPI_COMM_WORLD, &col_iters_recv_requests[i]);
             MPI_Irecv(recv_diagnostics[i], 5, MPI_FLOAT, i, 0, MPI_COMM_WORLD, &diagnostics_recv_requests[i]);
         }
 
 
+        for (i = 1; i < world_size; ++i) {
+            waiting_perf.elapsed_s += tmpp[i].elapsed_s;
+        }
+
         MPI_Waitall(world_size-1, recv_requests + 1, recv_statuses + 1);
         MPI_Waitall(world_size-1, diagnostics_recv_requests + 1, MPI_STATUSES_IGNORE);
         MPI_Waitall(world_size-1, col_iters_recv_requests + 1, MPI_STATUSES_IGNORE);
 
-        tperf_end(waiting_perf);
+
+
         diagnostics_history[diagnostics_history_idx].time_wait = waiting_perf.elapsed_s;
         
 
@@ -440,7 +451,9 @@ void master_loop() {
             }
         }
 
-        printf("max size: %lf Mb, max time: %lf s\n", max_sz / (1024.0 * 1024.0), max_time);
+        printf("visuals fps: %lf\n", 1.0 / diagnostics_history[diagnostics_history_idx].time_visuals);
+
+        //printf("max size: %lf Mb, max time: %lf s\n", max_sz / (1024.0 * 1024.0), max_time);
         
         /*
 
@@ -557,7 +570,7 @@ void slave_loop() {
             tperf_end(compress_perf);
 
             tperf_start(io_perf);
-            MPI_Send(&compressed_size, 1, MPI_INT, 0, 0, MPI_COMM_WORLD); 
+            //MPI_Send(&compressed_size, 1, MPI_INT, 0, 0, MPI_COMM_WORLD); 
             MPI_Send(my_compressed_buffer, compressed_size, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
             tperf_end(io_perf);
         } else {
@@ -566,7 +579,7 @@ void slave_loop() {
             tperf_end(compress_perf);
 
             tperf_start(io_perf);
-            MPI_Send(&my_result_size, 1, MPI_INT, 0, 0, MPI_COMM_WORLD); 
+            //MPI_Send(&my_result_size, 1, MPI_INT, 0, 0, MPI_COMM_WORLD); 
             MPI_Send(my_result, my_result_size, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
             tperf_end(io_perf);
         }
