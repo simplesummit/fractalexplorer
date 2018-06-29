@@ -427,15 +427,20 @@ void master_loop() {
 
         /* PRINT DIAGNOSTICS */
         int k;
+        float max_time = -INFINITY;
         float max_sz = -INFINITY;
         for (k = 1; k < world_size; ++k) {
             float cur_sz = prev_node_results_len[k];
+            float cur_time = recv_diagnostics[k][4];
             if (cur_sz > max_sz) {
                 max_sz = cur_sz;
             }
+            if (cur_time > max_time) {
+                max_time = cur_time;
+            }
         }
 
-        printf("max size: %lf Mb\n", max_sz / (1024.0 * 1024.0));
+        printf("max size: %lf Mb, max time: %lf s\n", max_sz / (1024.0 * 1024.0), max_time);
         
         /*
 
