@@ -403,7 +403,7 @@ void visuals_update(unsigned char * fractal_pixels) {
             
 
             float compute_prop = max_compute_time / biggest_time;
-            float io_prop = cur_graph_diag.time_assign;//max_io_time + cur_graph_diag.time_recombo + cur_graph_diag.time_;
+            float io_prop = cur_graph_diag.time_assign + cur_graph_diag.time_visuals + cur_graph_diag.time_recombo;//max_io_time + cur_graph_diag.time_recombo + cur_graph_diag.time_;
             /*if (cur_graph_diag.time_wait < 0.01) {
                 // only count the recombo if it was waited on
                 io_prop += cur_graph_diag.time_recombo;

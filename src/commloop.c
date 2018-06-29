@@ -423,55 +423,24 @@ void master_loop() {
         diagnostics_history[diagnostics_history_idx].time_total = total_perf.elapsed_s;
 
 
+
+
         /* PRINT DIAGNOSTICS */
-        /*
         int k;
-        float min_time = INFINITY;
-        float max_time = -INFINITY;
+        float max_sz = -INFINITY;
         for (k = 1; k < world_size; ++k) {
-            if (recv_diagnostics[k][3] < min_time) {
-                min_time = recv_diagnostics[k][3];
-            }
-            if (recv_diagnostics[k][3] > max_time) {
-                max_time = recv_diagnostics[k][3];
+            float cur_sz = prev_node_results_len[k];
+            if (cur_sz > max_sz) {
+                max_sz = cur_sz;
             }
         }
+
+        printf("max size: %lf Mb\n", max_sz / (1024.0 * 1024.0));
         
-
-        float differential = (max_time - min_time) / max_time;
-
-        */
-        //printf("%f, max differential: %%%f\n", max_time, 100.0 * differential);
-
-
-
         /*
-        double fastest_transfer = INFINITY;
-        int k;
-        for (k = 1; k < world_size; ++k) {
 
-            double cur_tr = (double)prev_node_results_len[k] / (double)recv_diagnostics[k][4];
-            if (cur_tr < fastest_transfer) {
-                fastest_transfer = cur_tr;
-            }
-        }
-
-        log_debug("slowest speed: %lf Mb/s", fastest_transfer / (1024.0 * 1024.0));
 
         */
-
-
-        //printf("FPS: %03.1f, diff: %%%03.1f\n", 1.0 / total_perf.elapsed_s, 100.0 * differential);
-        //printf("visuals FPS: %.1f\n", 1.0 / visuals_perf.elapsed_s);
-
-        //printf("longest compute %%%f\n", 100.0 *longest_compute_time/total_perf.elapsed_s);
-        //printf("total %f\n", total_perf.elapsed_s);
-        //printf("waiting %f\n", (waiting_perf.elapsed_s) / total_perf.elapsed_s);
-        //printf("visual %%%f\n", 100.0 * visuals_perf.elapsed_s / total_perf.elapsed_s);
-        //printf("assigning %%%f\n", 100.0 * assigning_perf.elapsed_s / total_perf.elapsed_s);
-        //printf("recombo %%%f\n", 100.0 * recombo_perf.elapsed_s / total_perf.elapsed_s);
-        //printf("control_update %%%f\n", 100.0 * control_update_perf.elapsed_s / total_perf.elapsed_s);
-
 
         // sync up optionally
 
