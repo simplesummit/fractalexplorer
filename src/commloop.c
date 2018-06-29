@@ -85,10 +85,10 @@ void master_loop() {
     float ** recv_diagnostics = (float **)malloc(sizeof(float *) * world_size);
     unsigned char ** uncompressed_workloads = (unsigned char **)malloc(sizeof(unsigned char *) * world_size);
 
-    int compress_bound = LZ4_compressBound(3 * fractal_params.width * fractal_params.height);
+    int compress_bound = LZ4_compressBound(4 * fractal_params.width * fractal_params.height);
 
     for (i = 0; i < world_size; ++i) {
-        uncompressed_workloads[i] = (char *)malloc(3 * fractal_params.width * fractal_params.height);
+        uncompressed_workloads[i] = (char *)malloc(4 * fractal_params.width * fractal_params.height);
 
         recv_diagnostics[i] = (float *)malloc(sizeof(float) * 5);
         for (j = 0; j < 5; ++j) {
@@ -131,7 +131,13 @@ void master_loop() {
     int * prev_node_results_len = (int *)malloc(sizeof(int) * world_size);
 
 
-    unsigned char * total_image = (unsigned char *)malloc(3 * fractal_params.width * fractal_params.height);
+    unsigned char * total_image_colmajor = (unsigned char *)malloc(4 * fractal_params.width * fractal_params.height);
+
+    unsigned char * total_image = (unsigned char *)malloc(4 * fractal_params.width * fractal_params.height);
+
+#ifdef HAVE_CUDA
+    engine_cuda_min_init();
+#endif
 
     for (i = 1; i < world_size; ++i) {
         node_workloads[i].assigned_cols_len = 0;
@@ -295,60 +301,43 @@ void master_loop() {
         if (n_frames > 0) {
 
 
-#pragma omp parallel for
+//#pragma omp parallel for
         for (i = 1; i < world_size; ++i) {
             int col;
 
             // you'd uncompress here
             if (fractal_params.flags & FRACTAL_FLAG_USE_COMPRESSION) {
-                LZ4_decompress_safe((char *)prev_node_results[i], (char *)uncompressed_workloads[i], prev_node_results_len[i], 3 * fractal_params.width * fractal_params.height);
+                LZ4_decompress_safe((char *)prev_node_results[i], (char *)uncompressed_workloads[i], prev_node_results_len[i], 4 * fractal_params.width * fractal_params.height);
             } else {
                 memcpy(uncompressed_workloads[i], prev_node_results[i], prev_node_results_len[i]);
             }
 
-
-            //log_trace("TRACE POINT b4 %d", i);
-
             int k;
+//#pragma omp parallel for
             for (k = 0; k < previous_node_workloads[i].assigned_cols_len; ++k) {
-                col = previous_node_workloads[i].assigned_cols[k];
-
-                // change from packed column major to full image row major
-                int row_i, to_idx, from_idx;
-                for (row_i = 0; row_i < fractal_params.height; ++row_i) {
-                    from_idx = fractal_params.height * k + row_i;
-                    to_idx = fractal_params.width * row_i + col;
-
-                    //two methods of doing this
-
-
-                    ((RGB_t *)total_image)[to_idx] = ((RGB_t *)(uncompressed_workloads[i]))[from_idx];
- 
-
-                  // total_image[3 * to_idx + 0] = uncompressed_workloads[i][3 * from_idx + 0];
-                   // total_image[3 * to_idx + 1] = uncompressed_workloads[i][3 * from_idx + 1];
-                   // total_image[3 * to_idx + 2] = uncompressed_workloads[i][3 * from_idx + 2];
+                int col = previous_node_workloads[i].assigned_cols[k];
+                int l;
+                for (l = 0; l < fractal_params.height; ++l) {
+                    ((RGBA_t *)total_image_colmajor)[fractal_params.height * col + l] = ((RGBA_t *)uncompressed_workloads[i])[fractal_params.height * k + l];
                 }
             }
+
         }
+          
         
+#ifdef HAVE_CUDA
+        cuda_colmajor_to_rowmajor((RGBA_t*)total_image_colmajor, (RGBA_t*)total_image);
+#else
+        c_colmajor_to_rowmajor((RGBA_t*)total_image_colmajor, (RGBA_t*)total_image);  
+#endif
+        
+
         }
 
         tperf_end(recombo_perf);
         diagnostics_history[diagnostics_history_idx].time_recombo = recombo_perf.elapsed_s;
         
-        tperf_start(visuals_perf);
 
-        log_trace("before visuals update");
-
-        visuals_update(total_image);
-
-        log_trace("after visuals update");
-
-        tperf_end(visuals_perf);
-
-
-        diagnostics_history[diagnostics_history_idx].time_visuals = visuals_perf.elapsed_s;
 
 
         tperf_start(control_update_perf);
@@ -363,6 +352,21 @@ void master_loop() {
         tperf_end(control_update_perf);
         diagnostics_history[diagnostics_history_idx].time_control_update = control_update_perf.elapsed_s;
 
+        tperf_start(visuals_perf);
+
+        log_trace("before visuals update");
+
+        visuals_update(total_image);
+
+        log_trace("after visuals update");
+
+        tperf_end(visuals_perf);
+printf("visuals fps: %lf\n", 1.0 / visuals_perf.elapsed_s);
+
+
+        diagnostics_history[diagnostics_history_idx].time_visuals = visuals_perf.elapsed_s;
+
+
 
         tperf_start(waiting_perf);        
         tperf_t *tmpp = (tperf_t *)malloc(world_size * sizeof(tperf_t));
@@ -373,7 +377,7 @@ void master_loop() {
         for (i = 1; i < world_size; ++i) {
             send_workload(node_workloads[i], i);
 
-            int node_workload_size = 3 * fractal_params.height * node_workloads[i].assigned_cols_len;
+            int node_workload_size = 4 * fractal_params.height * node_workloads[i].assigned_cols_len;
             int cur_rec_size;
 
             tperf_start(tmpp[i]);
@@ -435,8 +439,7 @@ void master_loop() {
 
 
 
-
-        /* PRINT DIAGNOSTICS */
+/*
         int k;
         float max_time = -INFINITY;
         float max_sz = -INFINITY;
@@ -452,7 +455,7 @@ void master_loop() {
         }
 
         printf("visuals fps: %lf\n", 1.0 / diagnostics_history[diagnostics_history_idx].time_visuals);
-
+*/
         //printf("max size: %lf Mb, max time: %lf s\n", max_sz / (1024.0 * 1024.0), max_time);
         
         /*
@@ -506,11 +509,11 @@ void slave_loop() {
 
     workload_t my_workload;
     my_workload.assigned_cols = (int *)malloc(sizeof(int) * fractal_params.width);
-    unsigned char * my_result = malloc(3 * fractal_params.width * fractal_params.height);
+    unsigned char * my_result = malloc(4 * fractal_params.width * fractal_params.height);
     // holds an array of iterations per column
     int * my_result_iters = (int *)malloc(sizeof(int) * fractal_params.width);
-    unsigned char * my_compressed_buffer = malloc(LZ4_compressBound(3 * fractal_params.width * fractal_params.height));
-    memset(my_result, 0, 3 * fractal_params.width * fractal_params.height);
+    unsigned char * my_compressed_buffer = malloc(LZ4_compressBound(4 * fractal_params.width * fractal_params.height));
+    memset(my_result, 0, 4 * fractal_params.width * fractal_params.height);
     
     int my_result_size = 0;
 
@@ -562,7 +565,7 @@ void slave_loop() {
 
         tperf_end(compute_perf);
 
-        my_result_size = 3 * fractal_params.height * my_workload.assigned_cols_len;
+        my_result_size = 4 * fractal_params.height * my_workload.assigned_cols_len;
 
         if (fractal_params.flags & FRACTAL_FLAG_USE_COMPRESSION) {
             tperf_start(compress_perf);

@@ -16,6 +16,19 @@ void engine_c_init() {
 }
 
 
+
+void c_colmajor_to_rowmajor(RGBA_t * input, RGBA_t * output) {
+
+    int i;
+    for (i = 0; i < fractal_params.width; ++i) {
+        int j;
+        for (j = 0; j < fractal_params.height; ++j) {
+            output[i + fractal_params.width * j] = input[j + fractal_params.height * i];
+        }
+    } 
+}
+
+
 // returns 3byte packed pixels of successive rows, and stores the number of iterations for each column in output_iters
 void engine_c_compute(workload_t workload, unsigned char * output, int * output_iters) {
     int col_idx;
@@ -37,8 +50,9 @@ void engine_c_compute(workload_t workload, unsigned char * output, int * output_
     int iter;
     int col_iters;
 
-    RGB_t cur_color;
-    RGB_t * _output_rgb = (RGB_t *)output;
+    RGBA_t cur_color;
+    cur_color.A = 255;
+    RGBA_t * _output_rgba = (RGBA_t *)output;
     RGB_t col_before, col_after;
     double partial_iteration;
 
@@ -171,7 +185,7 @@ void engine_c_compute(workload_t workload, unsigned char * output, int * output_
 
 
 
-            _output_rgb[output_idx] = cur_color;
+            _output_rgba[output_idx] = cur_color;
         }
         
         output_iters[col_idx] = col_iters;

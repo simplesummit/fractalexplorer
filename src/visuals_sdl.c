@@ -25,6 +25,7 @@ SDL_Renderer * renderer;
 
 // where we store the fractal image
 SDL_Texture * texture;
+unsigned char * texture_raw;
 
 // graphs
 int assign_col_graph_w, assign_col_graph_h;
@@ -95,18 +96,21 @@ void visuals_sdl_init() {
     SDL_GetWindowSize(window, &fractal_params.width, &fractal_params.height);
 //    SDL_ShowCursor(SDL_DISABLE);
 
-    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_TARGETTEXTURE); //SDL_RENDERER_ACCELERATED
+    // SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_TARGETTEXTURE
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
     if (renderer == NULL) {
         log_fatal("Fail on SDL_CreateRenderer(): %s", SDL_GetError());
         M_EXIT(1);
     }
 
+   //log_info("render mode: %d", renderer->info.texture_formats[0]);
+
     //overlay_mode = SDL_ComposeCustomBlendMode(SDL_BLENDFACTOR_SRC_ALPHA, SDL_BLENDFACTOR_ONE_MINUS_SRC_ALPHA, SDL_BLENDOPERATION_ADD, SDL_BLENDFACTOR_ZERO, SDL_BLENDFACTOR_ONE, SDL_BLENDOPERATION_ADD);
 
     //overlay_mode = SDL_BLENDMODE_BLEND;
 
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 120);
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
     //SDL_SetRenderDrawBlendMode(renderer, overlay_mode);
@@ -121,11 +125,13 @@ void visuals_sdl_init() {
     FC_LoadFont(font, renderer, font_path, font_size, FC_MakeColor(0, 0, 0, 255), TTF_STYLE_NORMAL);
 
 
-    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, fractal_params.width, fractal_params.height);
+    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, fractal_params.width, fractal_params.height);
     if (texture == NULL) {
         log_fatal("Fail on SDL_CreateTexture(): %s", SDL_GetError());
         M_EXIT(1);
     }
+
+    texture_raw = (unsigned char *)malloc(4 * fractal_params.width * fractal_params.height);
 
     assign_col_graph_w = fractal_params.width;
     assign_col_graph_h = fractal_params.height / 5;
@@ -249,13 +255,11 @@ void visuals_sdl_update(unsigned char * fractal_pixels) {
    // memcpy(req_pix, fractal_pixels, pitch * fractal_params.height);
 
 
-    SDL_UpdateTexture(texture, NULL, fractal_pixels, 3 * fractal_params.width);
+    SDL_UpdateTexture(texture, NULL, fractal_pixels, 4 * fractal_params.width);
 
     SDL_RenderCopy(renderer, texture, NULL, NULL);
 
-    SDL_RenderPresent(renderer);
 
-    return; 
     if (!is_theatrical_mode) {
 
 
@@ -412,7 +416,7 @@ void visuals_sdl_update(unsigned char * fractal_pixels) {
             
 
             float compute_prop = max_compute_time / biggest_time;
-            float io_prop = cur_graph_diag.time_wait + max_io_time + cur_graph_diag.time_recombo;// + cur_graph_diag.time_;
+            float io_prop = cur_graph_diag.time_recombo;// + cur_graph_diag.time_;
             /*if (cur_graph_diag.time_wait < 0.01) {
                 // only count the recombo if it was waited on
                 io_prop += cur_graph_diag.time_recombo;

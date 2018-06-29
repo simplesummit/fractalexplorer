@@ -21,7 +21,9 @@ void visuals_init() {
     if (visuals_flag == VISUALS_USE_SDL) {
         visuals_sdl_init();
     } else if (visuals_flag == VISUALS_USE_GLFW) {
+#ifdef HAVE_GLFW
         visuals_glfw_init();
+#endif
     }
 }
 
@@ -29,7 +31,9 @@ void visuals_update(unsigned char * fractal_pixels) {
     if (visuals_flag == VISUALS_USE_SDL) {
         visuals_sdl_update(fractal_pixels);
     } else if (visuals_flag == VISUALS_USE_GLFW) {
+#ifdef HAVE_GLFW
         visuals_glfw_update(fractal_pixels);
+#endif
     }
 }
 
@@ -37,7 +41,9 @@ void visuals_finish() {
     if (visuals_flag == VISUALS_USE_SDL) {
         visuals_sdl_finish();
     } else if (visuals_flag == VISUALS_USE_GLFW) {
+#ifdef HAVE_GLFW
         visuals_glfw_finish();
+#endif
     }
 }
 

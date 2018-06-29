@@ -16,6 +16,8 @@ But they are switched by visuals.c
 #define VISUALS_USE_SDL 0x0001
 #define VISUALS_USE_GLFW 0x0002
 
+//#define HAVE_GLFW
+
 
 int visuals_flag;
 
