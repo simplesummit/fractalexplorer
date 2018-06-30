@@ -56,11 +56,14 @@ void control_update_init() {
 
 int _joy_i = -1;
 
+#include "commloop.h"
+
 control_update_t control_update_loop_sdl() {
     control_update_t result;
 
     result.updated = false;
     result.quit = false;
+    diagnostics_t cdiag = diagnostics_history[(diagnostics_history_idx - 1 + NUM_DIAGNOSTICS_SAVE) % NUM_DIAGNOSTICS_SAVE];
 
 
     bool keep_going = true;
@@ -169,6 +172,8 @@ control_update_t control_update_loop_sdl() {
         result.updated = true;
     }
 
+    if (WHENPRESS(SDL_SCANCODE_Z)) fractal_params.flags ^= FRACTAL_FLAG_GRADIENT;
+
 #define SMASH(x) (fabs(x) > 0.05f) ? (x) : 0.0f;
 #define JOYSCALE(x) SMASH(((float)(x))/(32768.0f))
     if (joystick != NULL) {
@@ -181,17 +186,40 @@ control_update_t control_update_loop_sdl() {
         fractal_params.q_r += time_mul * qr / (5000.0 * fractal_params.zoom);
         fractal_params.q_i -= time_mul * qi / (5000.0 * fractal_params.zoom);
 
-/*
+
         float zoom_in = JOYSCALE(SDL_JoystickGetAxis(joystick, CONTROLLER_ZOOM_POS_AXIS));
         float zoom_out = JOYSCALE(SDL_JoystickGetAxis(joystick, CONTROLLER_ZOOM_NEG_AXIS));
 
         float total_zoom = zoom_in - zoom_out;
-        fractal_params.zoom *= pow(2.5, time_mul * total_zoom / 1000.0);
-*/
+        fractal_params.zoom /= pow(2.5, time_mul * total_zoom / 2000.0);
 
-        result.updated = true;
+#define JOYBUTTON(x) SDL_JoystickGetButton(joystick, x)
+        if (JOYBUTTON(CONTROLLER_FRF_GRADIENT_BUTTON)) fractal_params.flags ^= FRACTAL_FLAG_GRADIENT;
+
+        if (fabs(horiz) + fabs(vertical) + fabs(qr) + fabs(qi) > 0.1f) result.updated = true;
     }
 
+
+// automation of iterations
+    float avg_compute_time = 0;
+    int i;
+    if (n_frames > 1)
+    for (i = 1; i < world_size; ++i) avg_compute_time += cdiag.node_information[i].time_compute;
+    avg_compute_time /= (world_size - 1);
+
+
+    float goal_compute_time = 0.4 * cdiag.time_total;
+
+    if (avg_compute_time < goal_compute_time) {
+        fractal_params.max_iter += (int)floor(25.0 * (goal_compute_time - avg_compute_time) / goal_compute_time);
+    } else if (goal_compute_time < avg_compute_time) {
+        fractal_params.max_iter -= (int)floor(2500.0 * (avg_compute_time - goal_compute_time) / goal_compute_time);
+    }
+
+
+    if (fractal_params.max_iter < 20) fractal_params.max_iter = 20;
+    if (fractal_params.max_iter > 2500) fractal_params.max_iter = 2500;
+ 
     // quit
     if (WHENPRESS(SDL_SCANCODE_ESCAPE)) {
         result.quit = true;

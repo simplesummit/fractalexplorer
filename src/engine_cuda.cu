@@ -335,8 +335,9 @@ __global__ void _engine_cuda_kernel(fractal_params_t frp, int color_scheme_len, 
     
     RGB_t color;
 
-
-    if (frp.flags & FRACTAL_FLAG_GRADIENT) {
+    if (iter >= frp.max_iter - 1) {
+        color.R = 0; color.G = 0; color.B = 0;
+    } else if (frp.flags & FRACTAL_FLAG_GRADIENT) {
         RGB_t color_after = ((RGB_t *)color_scheme)[after_idx];
         color.R = lin_mix(color_before.R, color_after.R, gradient);
         color.G = lin_mix(color_before.G, color_after.G, gradient);

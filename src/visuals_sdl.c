@@ -99,7 +99,7 @@ void visuals_sdl_init() {
 //    SDL_ShowCursor(SDL_DISABLE);
 
     // SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_TARGETTEXTURE
-    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 
     if (renderer == NULL) {
         log_fatal("Fail on SDL_CreateRenderer(): %s", SDL_GetError());
@@ -608,7 +608,7 @@ void visuals_sdl_update(unsigned char * fractal_pixels) {
         sprintf(info_graph_messages[2], "Zoom: %.2e", fractal_params.zoom);
         FC_Draw(font, renderer, info_graph_texture_xoff, info_graph_texture_yoff + 3 * font_size, info_graph_messages[2]);
 
-        sprintf(info_graph_messages[3], "Eqn: %s", fractal_types[fractal_type_idx].equation);
+        sprintf(info_graph_messages[3], "Eqn: %s, Iter: %d", fractal_types[fractal_type_idx].equation, fractal_params.max_iter);
         FC_Draw(font, renderer, info_graph_texture_xoff, info_graph_texture_yoff + 4 * font_size, info_graph_messages[3]);
         
         // put FPS on screen

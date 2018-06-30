@@ -170,13 +170,15 @@ void engine_c_compute(workload_t workload, unsigned char * output, int * output_
             col_before = _local_color_scheme[before_idx];
 
 
-            if (fractal_params.flags & FRACTAL_FLAG_GRADIENT) {
+            if (iter >= fractal_params.max_iter - 1) {
+                cur_color.R = 0; cur_color.G = 0; cur_color.B = 0;
+            } else if (fractal_params.flags & FRACTAL_FLAG_GRADIENT) {
                 col_after = _local_color_scheme[after_idx];
                 // mix them
                 cur_color.R = lin_mix(col_before.R, col_after.R, gradient);
                 cur_color.G = lin_mix(col_before.G, col_after.G, gradient);
                 cur_color.B = lin_mix(col_before.B, col_after.B, gradient);
-	        } else {
+	    } else {
                 cur_color.R = col_before.R;
                 cur_color.G = col_before.G;
                 cur_color.B = col_before.B;
