@@ -15,7 +15,7 @@ But they are switched by visuals.c
 #include "visuals_sdl.h"
 #include "visuals_glfw.h"
 
-int visuals_flag = VISUALS_USE_SDL;
+int visuals_flag = VISUALS_USE_GLFW;
 
 void visuals_init() {
     if (visuals_flag == VISUALS_USE_SDL) {
