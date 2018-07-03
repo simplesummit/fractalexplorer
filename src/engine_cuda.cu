@@ -248,8 +248,8 @@ void cuda_colmajor_to_rowmajor(RGBA_t * input, RGBA_t * output) {
 
 
 
-    //_kernel_convert_colmajor_to_rowmajor<<<d_grid, d_block>>>(fractal_params.width, fractal_params.height, (RGBA_t*)GPU_memory.conv_input, (RGBA_t*)GPU_memory.conv_output);
-    _kernel_tranpose_coal<<<d_grid, d_block>>>((RGBA_t*)GPU_memory.conv_input, (RGBA_t*)GPU_memory.conv_output);
+    _kernel_convert_colmajor_to_rowmajor<<<d_grid, d_block>>>(fractal_params.width, fractal_params.height, (RGBA_t*)GPU_memory.conv_input, (RGBA_t*)GPU_memory.conv_output);
+    //_kernel_tranpose_coal<<<d_grid, d_block>>>((RGBA_t*)GPU_memory.conv_input, (RGBA_t*)GPU_memory.conv_output);
 
     gpuErrchk(cudaMemcpy(CPU_memory.conv_output, GPU_memory.conv_output, sizeof(RGBA_t) * fractal_params.width * fractal_params.height, cudaMemcpyDeviceToHost));
 

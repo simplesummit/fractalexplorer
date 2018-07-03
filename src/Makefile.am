@@ -27,12 +27,12 @@ fractalexplorer_SOURCES = fractalexplorer.c fractalexplorer.h fr.h log.c log.h e
 
 fractalexplorer_SOURCES += FontCache/SDL_FontCache.c FontCache/SDL_FontCache.h
 
-fractalexplorer_LDADD = @SDL_LDFLAGS@ -lSDL2_ttf 
+fractalexplorer_LDADD = @SDL_LDFLAGS@ -lSDL2_ttf -lGL -lGLEW -lglfw 
 
 
 # DELETE THIS LINE IF YOU GET AN ERROR THAT -fopenmp IS NOT UNDERSTOOD
-fractalexplorer_CFLAGS = @SDL_CFLAGS@ # -fopenmp
-fractalexplorer_LDFLAGS = -lglew -lglfw -framework OpenGL
+fractalexplorer_CFLAGS = @SDL_CFLAGS@ -fopenmp
+fractalexplorer_LDFLAGS = # -lGL -lGLEW -lglfw # -lglew -framework OpenGL
 
 if HAVE_CUDA
 fractalexplorer_LDADD += engine_cuda.o

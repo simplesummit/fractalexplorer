@@ -106,7 +106,7 @@ void visuals_glfw_init() {
 */
 
 
-    if (glfwInit() != GLFW_TRUE) {                                                  
+    if (glfwInit() != 1) {                                                  
         printf("Glfw failed to init\n");     
         exit(1);                           
     }     

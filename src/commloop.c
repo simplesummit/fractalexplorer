@@ -358,6 +358,7 @@ void master_loop() {
 
 #ifdef HAVE_CUDA
         cuda_colmajor_to_rowmajor((RGBA_t*)total_image_colmajor, (RGBA_t*)total_image);
+        //c_colmajor_to_rowmajor((RGBA_t*)total_image_colmajor, (RGBA_t*)total_image); 
 #else
         c_colmajor_to_rowmajor((RGBA_t*)total_image_colmajor, (RGBA_t*)total_image);  
 #endif
