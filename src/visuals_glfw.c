@@ -11,8 +11,6 @@ visuals library for the GLFW library
 //#define GL_GLEXT_PROTOTYPES
 
 //#include <GL/glew.h>
-#include <GL/glew.h> 
-#include <GLFW/glfw3.h>
 
 
 //#include <OpenGL/GL.h>
@@ -147,14 +145,15 @@ void visuals_glfw_init() {
     //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, fractal_params.width, fractal_params.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, fractal_params.width, fractal_params.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
     double ratio = (double)fractal_params.width / fractal_params.height;
 
+/*
     glViewport(0, 0, fractal_params.width, fractal_params.height);
     glOrtho(0, fractal_params.width, 0, fractal_params.height, -1, 1);
 
@@ -166,7 +165,7 @@ void visuals_glfw_init() {
     glPushMatrix();
     glLoadIdentity();
 
-
+*/
     //GLuint Texture = loadBMP_custom("/Users/7cb/test/julia_2.bmp");
 
 }
@@ -185,15 +184,15 @@ void visuals_glfw_update(unsigned char * fractal_pixels) {
     glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL);
     
     glBindTexture(GL_TEXTURE_2D, texture);
-
-    glBegin(GL_QUADS);
+    glBegin(GL_TRIANGLE_STRIP);
+    //glBegin(GL_QUADS);
         glTexCoord2f(0,0); glVertex2f(-1,-1);
-        glTexCoord2f(0,1); glVertex2f(-1,3);
-        glTexCoord2f(1,1); glVertex2f(3, 3);
-        glTexCoord2f(1,0); glVertex2f(3,-1);
+        glTexCoord2f(1,0); glVertex2f(1,-1);
+        glTexCoord2f(0,1); glVertex2f(-1, 1);
+        glTexCoord2f(1,1); glVertex2f(1,1);
     glEnd();
     glfwSwapBuffers(window);
-    glfwPollEvents();
+    //glfwPollEvents();
 }
 
 void visuals_glfw_finish() {

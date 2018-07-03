@@ -4,6 +4,11 @@
 #include "SDL.h"
 #include "log.h"
 
+#include "visuals.h"
+
+// 
+#include "visuals_glfw.h"
+
 #define SDL_SCANCODE_CACHE_SIZE 284
 
 #define WHENPRESS(scn) (key_state[scn] && !last_key_state[scn])
@@ -16,6 +21,8 @@ unsigned char * last_key_state = NULL;
 // used to scale pixel values to complex numbers
 // take pixel_coef * pixels/(sqrt(width*height)*zoom) to get the value
 double pixel_coef = 1.75f;
+
+float last_glfwtime;
 
 SDL_Event event;
 
@@ -41,7 +48,7 @@ void control_update_init() {
 
 }
 
-control_update_t control_update_loop() {
+control_update_t control_update_loop_sdl() {
     control_update_t result;
 
     result.updated = false;
@@ -60,8 +67,6 @@ control_update_t control_update_loop() {
     last_update_ticks = SDL_GetTicks();
 
     //SDL_PumpEvents();
-
-
 
     while (SDL_PollEvent(&event) && keep_going) {
         switch (event.type) {
@@ -152,4 +157,74 @@ control_update_t control_update_loop() {
 
     return result;
 }
+
+#define GLFW_ISPRESS(x) (glfwGetKey(window, x) == GLFW_PRESS)
+
+control_update_t control_update_loop_glfw() {
+    control_update_t result;
+
+    glfwPollEvents();
+
+    result.updated = false;
+    result.quit = false;
+
+
+    bool keep_going = true;
+
+    float time_mul = glfwGetTime() - last_glfwtime;
+
+    // so it isn't too jittery, cap it at 2 fps movement
+    if (time_mul > 0.5) {
+        time_mul = 0.5;
+    }
+
+    last_glfwtime = glfwGetTime();
+
+    //SDL_PumpEvents();
+
+    // these two sections make you able to pan using the keyboard
+    // adjust center imaginary
+    if (GLFW_ISPRESS(GLFW_KEY_W) || GLFW_ISPRESS(GLFW_KEY_UP)) {
+        fractal_params.center_i -= time_mul / fractal_params.zoom;
+        result.updated = true;
+    }
+
+    if (GLFW_ISPRESS(GLFW_KEY_S) || GLFW_ISPRESS(GLFW_KEY_DOWN)) {
+        fractal_params.center_i += time_mul / fractal_params.zoom;
+        result.updated = true;
+    }
+
+    if (GLFW_ISPRESS(GLFW_KEY_A) || GLFW_ISPRESS(GLFW_KEY_LEFT)) {
+        fractal_params.center_r -= time_mul / fractal_params.zoom;
+        result.updated = true;
+    }
+
+    if (GLFW_ISPRESS(GLFW_KEY_D) || GLFW_ISPRESS(GLFW_KEY_RIGHT)) {
+        fractal_params.center_r += time_mul / fractal_params.zoom;
+        result.updated = true;
+    }
+
+
+    if (GLFW_ISPRESS(GLFW_KEY_SPACE)) {
+        fractal_params.zoom *= pow(2.5, time_mul);
+        result.updated = true;
+    }
+
+    if (GLFW_ISPRESS(GLFW_KEY_LEFT_SHIFT) || GLFW_ISPRESS(GLFW_KEY_RIGHT_SHIFT)) {
+        fractal_params.zoom /= pow(2.5, time_mul);
+        result.updated = true;
+    }
+
+    return result;
+}
+
+
+control_update_t control_update_loop() {
+    if (visuals_flag == VISUALS_USE_SDL) {
+        return control_update_loop_sdl();
+    } else {
+        return control_update_loop_glfw();
+    }
+}
+
 
