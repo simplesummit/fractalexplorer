@@ -139,11 +139,14 @@ void setcol(fr_col_t col, char * scheme) {
             exit(1);
         }
         int i;
-        char r, g, b, a;
+        int r, g, b, a = 255;
         for (i = 0; i < col.num; ++i) {
             // send index and a float scaled value for convenience of calculation
-            fscanf(fp, ",,,", );
-            col.col[4 * i + 0];
+            fscanf(fp, "%d,%d,%d", &r, &g, &b);
+            col.col[4 * i + 0] = r;
+            col.col[4 * i + 1] = g;
+            col.col[4 * i + 2] = b;
+            col.col[4 * i + 3] = a;
         }
         return;
     }
