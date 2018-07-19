@@ -343,7 +343,7 @@ void window_refresh() {
         double ltotal_time = 1.0 / last_last_fps;
 
         graph_scale = total_time;
-
+/*
         for (i = 0; i < GRAPH_W; ++i) {
              if (graph_scale_array[i] > graph_scale && graph_scale_array[i] < 10.0) {
                  graph_scale = graph_scale_array[i];
@@ -380,6 +380,7 @@ void window_refresh() {
                 }
             }
         }
+
         // so far graphed
         for (i = GRAPH_W - 1; i < GRAPH_W; ++i) {
             double sfg = graph_scale;/*
@@ -391,7 +392,7 @@ void window_refresh() {
                 graph_texture_pixels[ri + 2] = 0;
                 graph_texture_pixels[ri + 3] = 200;
             }
-            sfg -= total_time;*/
+            sfg -= total_time;
             for (; j >= GRAPH_H * (sfg - 1.0 / last_compute_fps) / graph_scale && j >= 0; j--) {
                 ri = 4 * (j * GRAPH_W + i);
                 // this (compute time) shows up in blue
@@ -436,21 +437,23 @@ void window_refresh() {
                 graph_texture_pixels[ri + 2] = 0;
                 graph_texture_pixels[ri + 3] = 255;
             }
-        }
+        }*/
         //memset(graph_texture_pixels + 4 * (GRAPH_H-1) * GRAPH_W, 0, 4 * GRAPH_W);
         //graph_cpixel++;
-        SDL_UpdateTexture(graph_texture, NULL, graph_texture_pixels, 4 * GRAPH_W);
+        //SDL_UpdateTexture(graph_texture, NULL, graph_texture_pixels, 4 * GRAPH_W);
 
         //SDL_RenderCopy(renderer, legend_texture, NULL, &graph_offset);
 
 
         //memset(legend_texture_pixels, 0, 4 * LEGEND_W * LEGEND_H);
         }
-
+double st = MPI_Wtime();
         SDL_UpdateTexture(texture, NULL, pixels, 4 * fr.w);
+double et = MPI_Wtime();
+printf("update fps: %lf\n", 1.0 / (et - st));
         SDL_RenderCopy(renderer, texture, NULL, NULL);
 
-        if (show_extra && show_graph) {
+        if (show_extra && show_graph && false) {
            SDL_RenderCopy(renderer, graph_texture, NULL, &graph_offset);
            graph_offset.w = LEGEND_W;
            graph_offset.h = LEGEND_H;
@@ -481,6 +484,8 @@ void window_refresh() {
  //   	SDL_RenderPresent(renderer);
     )
     last_draw_fps = 1.0 / tp_draw.elapsed_s;
+
+printf("draw fps: %lf\n", last_draw_fps);
 
     last_graph_scale = graph_scale;
     if (show_extra && show_text_info) {
