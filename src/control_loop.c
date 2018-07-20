@@ -38,6 +38,12 @@ int last_update_ticks = 0;
 bool pan_with_mouse = false;
 
 void control_update_init() {
+
+    if (SDL_NumJoysticks() > 0) {
+        joystick = SDL_JoystickOpen(0);
+    }
+
+
     // this only needs to be called once
     key_state = (unsigned char *)SDL_GetKeyboardState(NULL);
     last_key_state = (unsigned char *)malloc(SDL_SCANCODE_CACHE_SIZE);
@@ -47,6 +53,9 @@ void control_update_init() {
     last_update_ticks = SDL_GetTicks();
 
 }
+
+// which controller scheme to use
+#include "controllers/logitech_f310.h"
 
 control_update_t control_update_loop_sdl() {
     control_update_t result;
@@ -101,8 +110,6 @@ control_update_t control_update_loop_sdl() {
     }
 
 
-
-
     // these two sections make you able to pan using the keyboard
     // adjust center imaginary
     if (ISPRESS(SDL_SCANCODE_UP) || ISPRESS(SDL_SCANCODE_W)) {
@@ -143,6 +150,24 @@ control_update_t control_update_loop_sdl() {
 
         fractal_type_idx = (fractal_type_idx + 1) % NUM_FRACTAL_TYPES;
         fractal_params.type = fractal_types[fractal_type_idx].flag;
+
+        result.updated = true;
+    }
+
+
+    if (SDL_NumJoysticks() > 0) {
+        joystick = SDL_JoystickOpen(0);
+    } else {
+        joystick = NULL;
+    }
+
+#define JOYSCALE(x) ((x)/(32768.0f))
+    if (joystick != NULL) {
+        float horiz = JOYSCALE(SDL_JoystickGetAxis(joystick, CONTROLLER_HORIZONTAL_AXIS));
+        printf("%f\n", horiz);
+        fractal_params.center_r += time_mul * horiz / (1000 * fractal_params.zoom);
+        float vertical = JOYSCALE(SDL_JoystickGetAxis(joystick, CONTROLLER_HORIZONTAL_AXIS));
+        fractal_params.center_i += time_mul * vertical / (1000 * fractal_params.zoom);
 
         result.updated = true;
     }

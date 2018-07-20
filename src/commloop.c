@@ -393,7 +393,7 @@ void master_loop() {
         log_trace("after visuals update");
 
         tperf_end(visuals_perf);
-printf("visuals fps: %lf\n", 1.0 / visuals_perf.elapsed_s);
+//printf("visuals fps: %lf\n", 1.0 / visuals_perf.elapsed_s);
 
 
         diagnostics_history[diagnostics_history_idx].time_visuals = visuals_perf.elapsed_s;

@@ -23,15 +23,15 @@ AM_LDFLAGS =
 
 bin_PROGRAMS = fractalexplorer
 
-fractalexplorer_SOURCES = fractalexplorer.c fractalexplorer.h fr.h log.c log.h engine_c.c engine_c.h control_loop.c control_loop.h visuals.c visuals.h visuals_sdl.c visuals_sdl.h visuals_glfw.c visuals_glfw.h #visuals_glfw.c visuals_glfw.h  #color.c color.h calc_c.c calc_c.h  fractalexplorer_calc_cuda.h util.c util.hrender.h render.c
+fractalexplorer_SOURCES = fractalexplorer.c fractalexplorer.h fr.h log.c log.h engine_c.c engine_c.h control_loop.c control_loop.h visuals.c visuals.h visuals_sdl.c visuals_sdl.h #visuals_glfw.c visuals_glfw.h  #color.c color.h calc_c.c calc_c.h  fractalexplorer_calc_cuda.h util.c util.hrender.h render.c
 
 fractalexplorer_SOURCES += FontCache/SDL_FontCache.c FontCache/SDL_FontCache.h
 
-fractalexplorer_LDADD = @SDL_LDFLAGS@ -lSDL2_ttf -lGL -lGLEW -lglfw 
+fractalexplorer_LDADD = @SDL_LDFLAGS@ -lSDL2_ttf  -lglfw  # -lGL -lGLEW
 
 
 # DELETE THIS LINE IF YOU GET AN ERROR THAT -fopenmp IS NOT UNDERSTOOD
-fractalexplorer_CFLAGS = @SDL_CFLAGS@ -fopenmp
+fractalexplorer_CFLAGS = @SDL_CFLAGS@ # -fopenmp
 fractalexplorer_LDFLAGS = # -lGL -lGLEW -lglfw # -lglew -framework OpenGL
 
 if HAVE_CUDA
