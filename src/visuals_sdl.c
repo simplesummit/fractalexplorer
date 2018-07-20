@@ -68,6 +68,8 @@ void visuals_sdl_init() {
         M_EXIT(1);
     }
 
+    SDL_JoystickEventState(SDL_ENABLE);
+
     SDL_version comp, link;
     
     SDL_VERSION(&comp);

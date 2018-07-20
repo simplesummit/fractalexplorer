@@ -3,8 +3,8 @@
 // these were found for the Logitech DualAction
 #define CONTROLLER_HORIZONTAL_AXIS      0
 #define CONTROLLER_VERTICAL_AXIS        1
-#define CONTROLLER_ZOOM_POS_AXIS        4
-#define CONTROLLER_ZOOM_NEG_AXIS        5
+#define CONTROLLER_ZOOM_POS_AXIS        5
+#define CONTROLLER_ZOOM_NEG_AXIS        4
 
 #define CONTROLLER_ZOOM_POS_BUTTON -1
 #define CONTROLLER_ZOOM_NEG_BUTTON -1

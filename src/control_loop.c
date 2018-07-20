@@ -39,9 +39,6 @@ bool pan_with_mouse = false;
 
 void control_update_init() {
 
-    if (SDL_NumJoysticks() > 0) {
-        joystick = SDL_JoystickOpen(0);
-    }
 
 
     // this only needs to be called once
@@ -56,6 +53,8 @@ void control_update_init() {
 
 // which controller scheme to use
 #include "controllers/logitech_f310.h"
+
+int _joy_i = -1;
 
 control_update_t control_update_loop_sdl() {
     control_update_t result;
@@ -76,7 +75,7 @@ control_update_t control_update_loop_sdl() {
     last_update_ticks = SDL_GetTicks();
 
     //SDL_PumpEvents();
-
+    SDL_JoystickUpdate();
     while (SDL_PollEvent(&event) && keep_going) {
         switch (event.type) {
             case SDL_QUIT: {
@@ -106,6 +105,22 @@ control_update_t control_update_loop_sdl() {
                 }
                 break;
             }
+            case SDL_JOYDEVICEADDED:
+                if (event.jdevice.which >= 0) {
+                    _joy_i = event.jdevice.which;
+                    printf("Joystick added: %d\n", _joy_i);
+                    joystick = SDL_JoystickOpen(_joy_i);
+
+                } break;
+            case SDL_JOYDEVICEREMOVED:
+                if (event.jdevice.which >= 0) {
+                    printf("Joystick removed: %d\n", event.jdevice.which);
+                    if (event.jdevice.which == _joy_i) {
+                        joystick = NULL; printf("removed active controller!\n");
+                        _joy_i = -1;
+                    }
+
+                } break;
         }
     }
 
@@ -154,20 +169,22 @@ control_update_t control_update_loop_sdl() {
         result.updated = true;
     }
 
-
-    if (SDL_NumJoysticks() > 0) {
-        joystick = SDL_JoystickOpen(0);
-    } else {
-        joystick = NULL;
-    }
-
-#define JOYSCALE(x) ((x)/(32768.0f))
+#define SMASH(x) (fabs(x) > 0.05f) ? (x) : 0.0f;
+#define JOYSCALE(x) SMASH(((float)(x))/(32768.0f))
     if (joystick != NULL) {
         float horiz = JOYSCALE(SDL_JoystickGetAxis(joystick, CONTROLLER_HORIZONTAL_AXIS));
-        printf("%f\n", horiz);
         fractal_params.center_r += time_mul * horiz / (1000 * fractal_params.zoom);
-        float vertical = JOYSCALE(SDL_JoystickGetAxis(joystick, CONTROLLER_HORIZONTAL_AXIS));
+        float vertical = -1.0f * JOYSCALE(SDL_JoystickGetAxis(joystick, CONTROLLER_VERTICAL_AXIS));
+printf("%f\n", vertical);
         fractal_params.center_i += time_mul * vertical / (1000 * fractal_params.zoom);
+
+/*
+        float zoom_in = JOYSCALE(SDL_JoystickGetAxis(joystick, CONTROLLER_ZOOM_POS_AXIS));
+        float zoom_out = JOYSCALE(SDL_JoystickGetAxis(joystick, CONTROLLER_ZOOM_NEG_AXIS));
+
+        float total_zoom = zoom_in - zoom_out;
+        fractal_params.zoom *= pow(2.5, time_mul * total_zoom / 1000.0);
+*/
 
         result.updated = true;
     }
