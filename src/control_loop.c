@@ -174,9 +174,8 @@ control_update_t control_update_loop_sdl() {
     if (joystick != NULL) {
         float horiz = JOYSCALE(SDL_JoystickGetAxis(joystick, CONTROLLER_HORIZONTAL_AXIS));
         fractal_params.center_r += time_mul * horiz / (1000 * fractal_params.zoom);
-        float vertical = -1.0f * JOYSCALE(SDL_JoystickGetAxis(joystick, CONTROLLER_VERTICAL_AXIS));
-printf("%f\n", vertical);
-        fractal_params.center_i += time_mul * vertical / (1000 * fractal_params.zoom);
+        float vertical = JOYSCALE(SDL_JoystickGetAxis(joystick, CONTROLLER_VERTICAL_AXIS));
+        fractal_params.center_i -= time_mul * vertical / (1000 * fractal_params.zoom);
 
 /*
         float zoom_in = JOYSCALE(SDL_JoystickGetAxis(joystick, CONTROLLER_ZOOM_POS_AXIS));
