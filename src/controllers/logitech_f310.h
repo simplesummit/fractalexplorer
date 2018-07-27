@@ -9,9 +9,9 @@
 #define CONTROLLER_ZOOM_POS_BUTTON -1
 #define CONTROLLER_ZOOM_NEG_BUTTON -1
 
-// tweaks fr.u parameter
-#define CONTROLLER_U_AXIS               2
-#define CONTROLLER_V_AXIS               3
+// tweaks fr.q parameter
+#define CONTROLLER_QR_AXIS               2
+#define CONTROLLER_QI_AXIS               3
 
 #define CONTROLLER_FRF_SIMPLE_BUTTON    2
 #define CONTROLLER_FRF_DREAL_BUTTON     1
