@@ -136,7 +136,7 @@ void visuals_sdl_init() {
     texture_raw = (unsigned char *)malloc(sizeof(RGB_t) * fractal_params.width * fractal_params.height);
 
     assign_col_graph_w = fractal_params.width;
-    assign_col_graph_h = fractal_params.height / 5;
+    assign_col_graph_h = fractal_params.height / 9;
 
     assign_col_graph_texture = SDL_CreateTexture(renderer, PIXEL_FORMAT, SDL_TEXTUREACCESS_STREAMING, assign_col_graph_w, assign_col_graph_h);
     if (assign_col_graph_texture == NULL) {
@@ -148,7 +148,7 @@ void visuals_sdl_init() {
 
 
 #define LEGEND_TEXT_SCALE 1.0
-    assign_col_legend_w = (int)floor(font_size * 4.2 * LEGEND_TEXT_SCALE);
+    assign_col_legend_w = (int)floor(font_size * 4.6 * LEGEND_TEXT_SCALE);
     assign_col_legend_h = (int)floor((world_size - 1) * font_size * LEGEND_TEXT_SCALE);
 
     assign_col_legend_texture = SDL_CreateTexture(renderer, PIXEL_FORMAT, SDL_TEXTUREACCESS_STREAMING, assign_col_legend_w, assign_col_legend_h);
@@ -368,7 +368,7 @@ void visuals_sdl_update(unsigned char * fractal_pixels) {
             cur_col.A = 200;
             for (i = 0; i < assign_col_legend_w; ++i) {
                 for (j = (int)floor((w-1) * font_size * LEGEND_TEXT_SCALE); j < (int)floor(w * font_size * LEGEND_TEXT_SCALE); ++j) {
-                    if (i > assign_col_legend_w - font_size * LEGEND_TEXT_SCALE * 1.75) {
+                    if (i > assign_col_legend_w - font_size * LEGEND_TEXT_SCALE * 2.2) {
                         if (nodes[w].type == NODE_TYPE_CPU) {
                             ((RGBA_t *)assign_col_legend_texture_raw)[i + assign_col_legend_w * j] = cur_col;
                         } else {
@@ -523,14 +523,14 @@ void visuals_sdl_update(unsigned char * fractal_pixels) {
 
         if (nodes[w].type == NODE_TYPE_CPU) {
             num_cpus++;
-            sprintf(info_graph_messages[1], "   G#%2d", w);
+            sprintf(info_graph_messages[1], "G#%2d", w);
         } else {
             num_gpus++;
-            sprintf(info_graph_messages[1], "   C#%2d", w);
+            sprintf(info_graph_messages[1], "C#%2d", w);
         }
 
 
-        FC_DrawScaleColor(font, renderer, assign_legend_dst_rect.x + font_size * LEGEND_TEXT_SCALE * (0.5 + 0.125), assign_legend_dst_rect.y + (w-1) * font_size * LEGEND_TEXT_SCALE, FC_MakeScale(LEGEND_TEXT_SCALE, LEGEND_TEXT_SCALE), text_color, info_graph_messages[1]);
+        FC_DrawScaleColor(font, renderer, assign_legend_dst_rect.x + font_size * LEGEND_TEXT_SCALE * (0.5 + 0.4 + 1.55), assign_legend_dst_rect.y + (w-1) * font_size * LEGEND_TEXT_SCALE, FC_MakeScale(LEGEND_TEXT_SCALE, LEGEND_TEXT_SCALE), text_color, info_graph_messages[1]);
     }
 
 

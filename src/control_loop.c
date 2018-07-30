@@ -63,7 +63,7 @@ control_update_t control_update_loop_sdl() {
 
     result.updated = false;
     result.quit = false;
-    diagnostics_t cdiag = diagnostics_history[(diagnostics_history_idx - 1 + NUM_DIAGNOSTICS_SAVE) % NUM_DIAGNOSTICS_SAVE];
+    //diagnostics_t cdiag = diagnostics_history[(diagnostics_history_idx - 1 + NUM_DIAGNOSTICS_SAVE) % NUM_DIAGNOSTICS_SAVE];
 
 
     bool keep_going = true;
@@ -201,12 +201,13 @@ control_update_t control_update_loop_sdl() {
 
 
 // automation of iterations
+
+/*
     float avg_compute_time = 0;
     int i;
     if (n_frames > 1)
     for (i = 1; i < world_size; ++i) avg_compute_time += cdiag.node_information[i].time_compute;
     avg_compute_time /= (world_size - 1);
-
 
     float goal_compute_time = 0.4 * cdiag.time_total;
 
@@ -219,7 +220,7 @@ control_update_t control_update_loop_sdl() {
 
     if (fractal_params.max_iter < 20) fractal_params.max_iter = 20;
     if (fractal_params.max_iter > 2500) fractal_params.max_iter = 2500;
- 
+ */
     // quit
     if (WHENPRESS(SDL_SCANCODE_ESCAPE)) {
         result.quit = true;

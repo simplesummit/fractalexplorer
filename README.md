@@ -171,3 +171,9 @@ Q: I'm getting an error that wasn't listed in this section, how do I troubleshoo
 A: Use fractalexplorer's verbose setting: add `-v5` to the argument list when running, and much more info will be printed. Paste the entire program log with `-v5` to [hastebin](https://hastebin.com/) or a similar site, and open up an [issue](https://github.com/ornl-leconte/fractalexplorer/issues/new), describe your problem and link the program output.
 
 
+## Additional info
+
+To record the screen on a Jetson, run `gst-launch-1.0 -v ximagesrc use-damage=0 ! nvvidconv ! 'video/x-raw(memory:NVMM),alignment=(string)au,format=(string)I420,framerate=(fraction)25/1,pixel-aspect-ratio=(fraction)1/1' ! omxh264enc ! 'video/x-h264,stream-format=(string)byte-stream' ! filesink location="test.h264" -e`
+
+
+
