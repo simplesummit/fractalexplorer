@@ -179,7 +179,7 @@ control_update_t control_update_loop_sdl() {
         float qr = JOYSCALE(SDL_JoystickGetAxis(joystick, CONTROLLER_QR_AXIS));
         float qi = JOYSCALE(SDL_JoystickGetAxis(joystick, CONTROLLER_QI_AXIS));
         fractal_params.q_r += time_mul * qr / (5000.0 * fractal_params.zoom);
-        fractal_params.q_i = time_mul * qi / (5000.0 * fractal_params.zoom);
+        fractal_params.q_i -= time_mul * qi / (5000.0 * fractal_params.zoom);
 
 /*
         float zoom_in = JOYSCALE(SDL_JoystickGetAxis(joystick, CONTROLLER_ZOOM_POS_AXIS));

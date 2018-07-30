@@ -86,10 +86,10 @@ void master_loop() {
     float ** recv_diagnostics = (float **)malloc(sizeof(float *) * world_size);
     unsigned char ** uncompressed_workloads = (unsigned char **)malloc(sizeof(unsigned char *) * world_size);
 
-    int compress_bound = LZ4_compressBound(4 * fractal_params.width * fractal_params.height);
+    int compress_bound = LZ4_compressBound(sizeof(RGB_t) * fractal_params.width * fractal_params.height);
 
     for (i = 0; i < world_size; ++i) {
-        uncompressed_workloads[i] = (char *)malloc(4 * fractal_params.width * fractal_params.height);
+        uncompressed_workloads[i] = (char *)malloc(sizeof(RGB_t) * fractal_params.width * fractal_params.height);
 
         recv_diagnostics[i] = (float *)malloc(sizeof(float) * 5);
         for (j = 0; j < 5; ++j) {
@@ -132,9 +132,9 @@ void master_loop() {
     int * prev_node_results_len = (int *)malloc(sizeof(int) * world_size);
 
 
-    unsigned char * total_image_colmajor = (unsigned char *)malloc(4 * fractal_params.width * fractal_params.height);
+    unsigned char * total_image_colmajor = (unsigned char *)malloc(sizeof(RGB_t) * fractal_params.width * fractal_params.height);
 
-    unsigned char * total_image = (unsigned char *)malloc(4 * fractal_params.width * fractal_params.height);
+    unsigned char * total_image = (unsigned char *)malloc(sizeof(RGB_t) * fractal_params.width * fractal_params.height);
 
 #ifdef HAVE_CUDA
     engine_cuda_min_init();
@@ -298,7 +298,7 @@ void master_loop() {
         for (i = 1; i < world_size; ++i) {
             send_workload(node_workloads[i], i);
 
-            int node_workload_size = 4 * fractal_params.height * node_workloads[i].assigned_cols_len;
+            int node_workload_size = sizeof(RGB_t) * fractal_params.height * node_workloads[i].assigned_cols_len;
             int cur_rec_size;
 
            // tperf_start(tmpp[i]);
@@ -328,7 +328,7 @@ void master_loop() {
 
             // you'd uncompress here
             if (fractal_params.flags & FRACTAL_FLAG_USE_COMPRESSION) {
-                LZ4_decompress_safe((char *)prev_node_results[i], (char *)uncompressed_workloads[i], prev_node_results_len[i], 4 * fractal_params.width * fractal_params.height);
+                LZ4_decompress_safe((char *)prev_node_results[i], (char *)uncompressed_workloads[i], prev_node_results_len[i], sizeof(RGB_t) * fractal_params.width * fractal_params.height);
             } else {
                 memcpy(uncompressed_workloads[i], prev_node_results[i], prev_node_results_len[i]);
             }
@@ -344,11 +344,11 @@ void master_loop() {
                     n_workloads++;
                 }
 
-                memcpy(((RGBA_t*)total_image_colmajor) + fractal_params.height * col, ((RGBA_t*)uncompressed_workloads[i]) + fractal_params.height * start_k, sizeof(RGBA_t) *  fractal_params.height * n_workloads);
+                memcpy(((RGB_t*)total_image_colmajor) + fractal_params.height * col, ((RGB_t*)uncompressed_workloads[i]) + fractal_params.height * start_k, sizeof(RGB_t) *  fractal_params.height * n_workloads);
 /*
                 int l;
                 for (l = 0; l < fractal_params.height; ++l) {
-                    ((RGBA_t *)total_image_colmajor)[fractal_params.height * col + l] = ((RGBA_t *)uncompressed_workloads[i])[fractal_params.height * k + l];
+                    ((RGB_t *)total_image_colmajor)[fractal_params.height * col + l] = ((RGB_t *)uncompressed_workloads[i])[fractal_params.height * k + l];
                 }
 */
             }
@@ -358,10 +358,10 @@ void master_loop() {
           
 
 #ifdef HAVE_CUDA
-        cuda_colmajor_to_rowmajor((RGBA_t*)total_image_colmajor, (RGBA_t*)total_image);
-        //c_colmajor_to_rowmajor((RGBA_t*)total_image_colmajor, (RGBA_t*)total_image); 
+        cuda_colmajor_to_rowmajor((RGB_t*)total_image_colmajor, (RGB_t*)total_image);
+        //c_colmajor_to_rowmajor((RGB_t*)total_image_colmajor, (RGB_t*)total_image); 
 #else
-        c_colmajor_to_rowmajor((RGBA_t*)total_image_colmajor, (RGBA_t*)total_image);  
+        c_colmajor_to_rowmajor((RGB_t*)total_image_colmajor, (RGB_t*)total_image);  
 #endif
         
 
@@ -518,11 +518,11 @@ void slave_loop() {
 
     workload_t my_workload;
     my_workload.assigned_cols = (int *)malloc(sizeof(int) * fractal_params.width);
-    unsigned char * my_result = malloc(4 * fractal_params.width * fractal_params.height);
+    unsigned char * my_result = malloc(sizeof(RGB_t) * fractal_params.width * fractal_params.height);
     // holds an array of iterations per column
     int * my_result_iters = (int *)malloc(sizeof(int) * fractal_params.width);
-    unsigned char * my_compressed_buffer = malloc(LZ4_compressBound(4 * fractal_params.width * fractal_params.height));
-    memset(my_result, 0, 4 * fractal_params.width * fractal_params.height);
+    unsigned char * my_compressed_buffer = malloc(LZ4_compressBound(sizeof(RGB_t) * fractal_params.width * fractal_params.height));
+    memset(my_result, 0, sizeof(RGB_t) * fractal_params.width * fractal_params.height);
     
     int my_result_size = 0;
 
@@ -574,12 +574,12 @@ void slave_loop() {
 
         tperf_end(compute_perf);
 
-        my_result_size = 4 * fractal_params.height * my_workload.assigned_cols_len;
+        my_result_size = sizeof(RGB_t) * fractal_params.height * my_workload.assigned_cols_len;
 
         if (fractal_params.flags & FRACTAL_FLAG_USE_COMPRESSION) {
             tperf_start(compress_perf);
             //int compressed_size = LZ4_compress_default((char *)my_result, (char *)my_compressed_buffer, my_result_size, LZ4_compressBound(my_result_size));
-            int compressed_size = LZ4_compress_HC((char *)my_result, (char *)my_compressed_buffer, my_result_size, LZ4_compressBound(my_result_size), 12); // min 3, max 12
+            int compressed_size = LZ4_compress_HC((char *)my_result, (char *)my_compressed_buffer, my_result_size, LZ4_compressBound(my_result_size), COMPRESS_LEVEL); // min 3, max 12
             tperf_end(compress_perf);
 
             tperf_start(io_perf);

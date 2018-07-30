@@ -127,13 +127,13 @@ void visuals_sdl_init() {
     FC_LoadFont(font, renderer, font_path, font_size, FC_MakeColor(0, 0, 0, 255), TTF_STYLE_NORMAL);
 
 
-    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, fractal_params.width, fractal_params.height);
+    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, fractal_params.width, fractal_params.height);
     if (texture == NULL) {
         log_fatal("Fail on SDL_CreateTexture(): %s", SDL_GetError());
         M_EXIT(1);
     }
 
-    texture_raw = (unsigned char *)malloc(4 * fractal_params.width * fractal_params.height);
+    texture_raw = (unsigned char *)malloc(sizeof(RGB_t) * fractal_params.width * fractal_params.height);
 
     assign_col_graph_w = fractal_params.width;
     assign_col_graph_h = fractal_params.height / 5;
@@ -257,7 +257,7 @@ void visuals_sdl_update(unsigned char * fractal_pixels) {
    // memcpy(req_pix, fractal_pixels, pitch * fractal_params.height);
 
 
-    SDL_UpdateTexture(texture, NULL, fractal_pixels, 4 * fractal_params.width);
+    SDL_UpdateTexture(texture, NULL, fractal_pixels, sizeof(RGB_t) * fractal_params.width);
 
     SDL_RenderCopy(renderer, texture, NULL, NULL);
 

@@ -13,7 +13,7 @@ void engine_cuda_compute(workload_t workload, unsigned char * output, int * outp
 // fast conversion boi
 void engine_cuda_min_init();
 
-void cuda_colmajor_to_rowmajor(RGBA_t * input, RGBA_t * output);
+void cuda_colmajor_to_rowmajor(RGB_t * input, RGB_t * output);
 
 #endif
 

@@ -12,6 +12,9 @@ node_t * nodes = NULL;
 
 node_t this_node;
 
+// min 3, max 12
+int COMPRESS_LEVEL = 3;
+
 fractal_type_t * fractal_types;
 int fractal_type_idx = 0;
 
@@ -112,12 +115,13 @@ int main(int argc, char ** argv) {
 
         log_info("world_size: %d", world_size);
 
-        while ((c = getopt(argc, argv, "v:q:s:c:z:i:A:T:Fh")) != (char)(-1)) {
+        while ((c = getopt(argc, argv, "v:q:s:c:z:i:A:T:C:Fh")) != (char)(-1)) {
             switch (c) {
             case 'h':
                 printf("Usage: fractal explorer [-h] [-v VERBOSE]\n");
                 printf("  -h                 help menu\n");
                 printf("  -v [N]             set verbosity (1=error only ... 5=trace)\n");
+                printf("  -C [N]             compression level (3=min, 12=max)\n");
                 printf("  -A [LABEL]         How to assign work (ALLCPU, ALLGPU)\n");
                 printf("  -c [a+bi]          set the starting center point\n");
                 printf("  -q [a+bi]          set q parameter start\n");
@@ -138,6 +142,9 @@ int main(int argc, char ** argv) {
                         printf("Warning: setting verbosity failed\n");
                     }
                 }
+                break;
+            case 'C':
+                sscanf(optarg, "%d", &COMPRESS_LEVEL);
                 break;
             case 'T':
                 font_path = optarg;
@@ -241,6 +248,7 @@ int main(int argc, char ** argv) {
 
         for (i = 1; i < world_size; ++i) {
             MPI_Send(&exit_code, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
+            MPI_Send(&COMPRESS_LEVEL, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
             MPI_Send(&verbose_send, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
         }       
 
@@ -338,6 +346,7 @@ int main(int argc, char ** argv) {
         int exit_code_recv;
 
         MPI_Recv(&exit_code_recv, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        MPI_Recv(&COMPRESS_LEVEL, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         MPI_Recv(&verbose_recv, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
         log_set_level(verbose_recv);

@@ -17,7 +17,7 @@ void engine_c_init() {
 
 
 
-void c_colmajor_to_rowmajor(RGBA_t * input, RGBA_t * output) {
+void c_colmajor_to_rowmajor(RGB_t * input, RGB_t * output) {
 
     int i;
     for (i = 0; i < fractal_params.width; ++i) {
@@ -50,9 +50,8 @@ void engine_c_compute(workload_t workload, unsigned char * output, int * output_
     int iter;
     int col_iters;
 
-    RGBA_t cur_color;
-    cur_color.A = 255;
-    RGBA_t * _output_rgba = (RGBA_t *)output;
+    RGB_t cur_color;
+    RGB_t * _output_rgba = (RGB_t *)output;
     RGB_t col_before, col_after;
     double partial_iteration;
 
@@ -173,16 +172,15 @@ void engine_c_compute(workload_t workload, unsigned char * output, int * output_
 
             if (fractal_params.flags & FRACTAL_FLAG_GRADIENT) {
                 col_after = _local_color_scheme[after_idx];
-		// mix them
-		cur_color.R = lin_mix(col_before.R, col_after.R, gradient);
-		cur_color.G = lin_mix(col_before.G, col_after.G, gradient);
-		cur_color.B = lin_mix(col_before.B, col_after.B, gradient);
-	    } else {
+                // mix them
+                cur_color.R = lin_mix(col_before.R, col_after.R, gradient);
+                cur_color.G = lin_mix(col_before.G, col_after.G, gradient);
+                cur_color.B = lin_mix(col_before.B, col_after.B, gradient);
+	        } else {
                 cur_color.R = col_before.R;
                 cur_color.G = col_before.G;
                 cur_color.B = col_before.B;
             }
-
 
 
             _output_rgba[output_idx] = cur_color;

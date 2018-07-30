@@ -37,6 +37,8 @@ int world_size, world_rank;
 #define compute_rank ((world_rank) - 1)
 
 
+int COMPRESS_LEVEL;
+
 char processor_name[MPI_MAX_PROCESSOR_NAME];
 int processor_name_len;
 

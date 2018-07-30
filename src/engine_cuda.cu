@@ -158,8 +158,8 @@ struct {
 
     int * output_iters_col_seperate;
 
-    RGBA_t * conv_input;
-    RGBA_t * conv_output;
+    RGB_t * conv_input;
+    RGB_t * conv_output;
 
 } CPU_memory;
 
@@ -167,19 +167,19 @@ struct {
 
 
 void engine_cuda_min_init() {
-    gpuErrchk(cudaHostAlloc((void **)&CPU_memory.conv_input, sizeof(RGBA_t) * fractal_params.width * fractal_params.height, cudaHostAllocDefault));
+    gpuErrchk(cudaHostAlloc((void **)&CPU_memory.conv_input, sizeof(RGB_t) * fractal_params.width * fractal_params.height, cudaHostAllocDefault));
 
-    gpuErrchk(cudaHostAlloc((void **)&CPU_memory.conv_output, sizeof(RGBA_t) * fractal_params.width * fractal_params.height, cudaHostAllocDefault));
+    gpuErrchk(cudaHostAlloc((void **)&CPU_memory.conv_output, sizeof(RGB_t) * fractal_params.width * fractal_params.height, cudaHostAllocDefault));
 
-//gpuErrchk(cudaMalloc((void **)&GPU_memory.conv_input, sizeof(RGBA_t) * fractal_params.width * fractal_params.height));
-    gpuErrchk(cudaMalloc((void **)&GPU_memory.conv_input, sizeof(RGBA_t) * fractal_params.width * fractal_params.height));
-    gpuErrchk(cudaMalloc((void **)&GPU_memory.conv_output, sizeof(RGBA_t) * fractal_params.width * fractal_params.height));
+//gpuErrchk(cudaMalloc((void **)&GPU_memory.conv_input, sizeof(RGB_t) * fractal_params.width * fractal_params.height));
+    gpuErrchk(cudaMalloc((void **)&GPU_memory.conv_input, sizeof(RGB_t) * fractal_params.width * fractal_params.height));
+    gpuErrchk(cudaMalloc((void **)&GPU_memory.conv_output, sizeof(RGB_t) * fractal_params.width * fractal_params.height));
 
 }
 void engine_cuda_init(fractal_params_t _fr_p, int color_scheme_len, unsigned char * color_scheme) {
     fractal_params = _fr_p;
     gpuErrchk(cudaMalloc((void **)&GPU_memory.assigned_cols, sizeof(int) * fractal_params.width));
-    gpuErrchk(cudaMalloc((void **)&GPU_memory.output, 4 * fractal_params.width * fractal_params.height));
+    gpuErrchk(cudaMalloc((void **)&GPU_memory.output, 3 * fractal_params.width * fractal_params.height));
 
     GPU_memory.color_scheme_len = color_scheme_len;
     gpuErrchk(cudaMalloc((void **)&GPU_memory.color_scheme, 3 * color_scheme_len));
@@ -194,7 +194,7 @@ void engine_cuda_init(fractal_params_t _fr_p, int color_scheme_len, unsigned cha
 
 }
 
-__global__ void _kernel_convert_colmajor_to_rowmajor(int width, int height, RGBA_t * input, RGBA_t * output) {
+__global__ void _kernel_convert_colmajor_to_rowmajor(int width, int height, RGB_t * input, RGB_t * output) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
     if (i >= width || j >= height) {
@@ -208,8 +208,8 @@ __global__ void _kernel_convert_colmajor_to_rowmajor(int width, int height, RGBA
 #define TILE_DIM 32
 #define BLOCK_ROWS 8
 
-__global__ void _kernel_tranpose_coal(RGBA_t * input, RGBA_t * output) {
-    __shared__ RGBA_t tile[TILE_DIM][TILE_DIM];
+__global__ void _kernel_tranpose_coal(RGB_t * input, RGB_t * output) {
+    __shared__ RGB_t tile[TILE_DIM][TILE_DIM];
 
     int x = blockIdx.x * TILE_DIM + threadIdx.x;
     int y = blockIdx.y * TILE_DIM + threadIdx.y;
@@ -233,7 +233,7 @@ __global__ void _kernel_tranpose_coal(RGBA_t * input, RGBA_t * output) {
 
 
 // returns 3byte packed pixels of successive rows, and stores the number of iterations for each column in output_iters
-void cuda_colmajor_to_rowmajor(RGBA_t * input, RGBA_t * output) {
+void cuda_colmajor_to_rowmajor(RGB_t * input, RGB_t * output) {
 
     dim3 d_block(16, 16);
     dim3 d_grid;
@@ -242,18 +242,18 @@ void cuda_colmajor_to_rowmajor(RGBA_t * input, RGBA_t * output) {
 
 
 
-    memcpy(CPU_memory.conv_input, input, sizeof(RGBA_t) * fractal_params.width * fractal_params.height);
+    memcpy(CPU_memory.conv_input, input, sizeof(RGB_t) * fractal_params.width * fractal_params.height);
 
-    gpuErrchk(cudaMemcpy(GPU_memory.conv_input, CPU_memory.conv_input, sizeof(RGBA_t) * fractal_params.width * fractal_params.height, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(GPU_memory.conv_input, CPU_memory.conv_input, sizeof(RGB_t) * fractal_params.width * fractal_params.height, cudaMemcpyHostToDevice));
 
 
 
-    _kernel_convert_colmajor_to_rowmajor<<<d_grid, d_block>>>(fractal_params.width, fractal_params.height, (RGBA_t*)GPU_memory.conv_input, (RGBA_t*)GPU_memory.conv_output);
-    //_kernel_tranpose_coal<<<d_grid, d_block>>>((RGBA_t*)GPU_memory.conv_input, (RGBA_t*)GPU_memory.conv_output);
+    _kernel_convert_colmajor_to_rowmajor<<<d_grid, d_block>>>(fractal_params.width, fractal_params.height, (RGB_t*)GPU_memory.conv_input, (RGB_t*)GPU_memory.conv_output);
+    //_kernel_tranpose_coal<<<d_grid, d_block>>>((RGB_t*)GPU_memory.conv_input, (RGB_t*)GPU_memory.conv_output);
 
-    gpuErrchk(cudaMemcpy(CPU_memory.conv_output, GPU_memory.conv_output, sizeof(RGBA_t) * fractal_params.width * fractal_params.height, cudaMemcpyDeviceToHost));
+    gpuErrchk(cudaMemcpy(CPU_memory.conv_output, GPU_memory.conv_output, sizeof(RGB_t) * fractal_params.width * fractal_params.height, cudaMemcpyDeviceToHost));
 
-    memcpy(output, CPU_memory.conv_output, sizeof(RGBA_t) * fractal_params.width * fractal_params.height);
+    memcpy(output, CPU_memory.conv_output, sizeof(RGB_t) * fractal_params.width * fractal_params.height);
 
 
 }
@@ -333,7 +333,7 @@ __global__ void _engine_cuda_kernel(fractal_params_t frp, int color_scheme_len, 
 
     RGB_t color_before = ((RGB_t *)color_scheme)[before_idx];
     
-    RGBA_t color;
+    RGB_t color;
 
 
     if (frp.flags & FRACTAL_FLAG_GRADIENT) {
@@ -348,7 +348,7 @@ __global__ void _engine_cuda_kernel(fractal_params_t frp, int color_scheme_len, 
     }
 
 
-    ((RGBA_t *)output)[frp.height * col_index + py] = color;
+    ((RGB_t *)output)[frp.height * col_index + py] = color;
     result_iters[frp.height * col_index + py] = iter;
 
 }
@@ -373,7 +373,7 @@ void engine_cuda_compute(workload_t workload, unsigned char * output, int * outp
 
     _engine_cuda_kernel<<<d_grid, d_block>>>(fractal_params, GPU_memory.color_scheme_len, GPU_memory.color_scheme, workload.assigned_cols_len, GPU_memory.assigned_cols, GPU_memory.output, GPU_memory.output_iters_col_seperate);
 
-    int res_size = 4 * fractal_params.height * workload.assigned_cols_len;
+    int res_size = 3 * fractal_params.height * workload.assigned_cols_len;
 
     gpuErrchk(cudaMemcpy(output, GPU_memory.output, res_size, cudaMemcpyDeviceToHost));
 
