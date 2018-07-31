@@ -58,12 +58,16 @@ int _joy_i = -1;
 
 #include "commloop.h"
 
+float last_change_ticks;
+
 control_update_t control_update_loop_sdl() {
     control_update_t result;
 
     result.updated = false;
     result.quit = false;
     //diagnostics_t cdiag = diagnostics_history[(diagnostics_history_idx - 1 + NUM_DIAGNOSTICS_SAVE) % NUM_DIAGNOSTICS_SAVE];
+
+    if (last_change_ticks < 0.0) last_change_ticks = SDL_GetTicks();
 
 
     bool keep_going = true;
@@ -221,10 +225,19 @@ control_update_t control_update_loop_sdl() {
     if (fractal_params.max_iter < 20) fractal_params.max_iter = 20;
     if (fractal_params.max_iter > 2500) fractal_params.max_iter = 2500;
  */
+
+    if (result.updated) {
+        last_change_ticks = SDL_GetTicks();
+    } else if (SDL_GetTicks() - last_change_ticks > 1000.0 * 120.0) {
+        fractal_params.center_r = 0.0; fractal_params.center_i = 0.0; fractal_params.max_iter = 250; fractal_params.q_r = 2.0; fractal_params.q_i = 0.15; fractal_params.zoom = 0.25;
+        result.updated= true;
+    }
+
     // quit
     if (WHENPRESS(SDL_SCANCODE_ESCAPE)) {
         result.quit = true;
     }
+
 
     memcpy(last_key_state, key_state, SDL_SCANCODE_CACHE_SIZE);
 
