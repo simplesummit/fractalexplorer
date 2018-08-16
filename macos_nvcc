@@ -1,0 +1,3 @@
+#!/bin/bash
+# basic script wrapper for nvcc
+nvcc -ccbin clang-3.7 $@

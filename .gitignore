@@ -1,57 +1,20 @@
-*.o
-*.so
-*.cuo
-*.pyc
-*.out
-*.tar*
-*.zip
-
-src/particle_sim
-src/mandelbrot
-src/fractalexplorer
-
-.vscode
 
 .DS_Store
 
-*.zip
+*.data
+*.pyc
+*.pyo
+*.pyd
+*.o
+
+
+.DS_Store
+
+
+*/.DS_Store
+
 *.tar*
-*.o
-*.a
-*.so
-.vscode/
-*.flv
-*.o
-*.la
-
-*.dylib
-*.dll
-*.so
-*.do
-*.lo
-
-/m4/
-
-.dirstamp
-
-a.out.dSYM
-
-ltmain.sh
-
-*.raw
-*.meta
-*.anim
-*.mp4
-*.gif
-*.bmp
-*.a
-*.la
-*.so
-*.dylib
-
-
-*.color
-!example_*
+out/
 
 *.orig
 Makefile
@@ -71,14 +34,22 @@ install-sh
 libtool
 ltmain.sh
 missing
-*.pc
 test-driver
+
+out/
+
+
+.vscode/
+
+*.out
+
+fractalexplorerconfig.h
+
+build/
 
 *.orig
 *.o
 *.out
-
-*.result
 
 *.tar
 *.tar.*
@@ -100,24 +71,29 @@ missing
 stamp-h1
 
 
+test.py
 
-*.pyc
-compileopencl.sh
-*.o
+# Setuptools distribution folder.
+/dist/
+/build/
 
-*.jpg
-*.jpeg
-*.gif
-*.avi
-*.bmp
-*.mov
-*.avi
-*.mpg
-*.mpeg
-*.mp4
-*.wmv
-*.jp2
-*.tif
+# Python egg metadata, regenerated from source files by setuptools.
+/*.egg-info
+/*.egg
+/.eggs
+
+src/fractalexplorer
+
 .vscode/
 
-*.Po
+*.wav
+
+*.mp3
+*.ogg
+*.flac
+*.mp4
+*.gif
+
+__pycache__
+
+.vscode/
