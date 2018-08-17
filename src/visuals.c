@@ -18,6 +18,8 @@ void visuals_init(int _win_width, int _win_height) {
     SDL_CreateWindowAndRenderer(win_width, win_height, 0, &window, &renderer);
 
     texture_fractal = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_BGR24, SDL_TEXTUREACCESS_STREAMING, win_height, win_height);
+    SDL_RenderClear(renderer);
+    SDL_RenderPresent(renderer);
 }
 
 bool visuals_update(hq_color_t * fractal_pixels) {
@@ -28,6 +30,9 @@ bool visuals_update(hq_color_t * fractal_pixels) {
 
     
     SDL_UpdateTexture(texture_fractal, NULL, fractal_pixels, sizeof(hq_color_t) * fractal_dim);
+
+    SDL_RenderClear(renderer);
+    // start rendering here
 
     SDL_Rect fractal_rect;
     fractal_rect.x = 0;

@@ -72,6 +72,12 @@ int main(int argc, char ** argv) {
             outputs[i] = NULL;
         }
 
+        for (i = 0; i < fractal.width * fractal.height; ++i) {
+            full_output[i] = hq_color_rgb(0, 0, 0);
+        }
+
+        double ltime = get_time();
+
         do {
             MPI_Bcast(&status, 1, MPI_INT, 0, MPI_COMM_WORLD);
             MPI_Bcast(&fractal, sizeof(fractal_t), MPI_BYTE, 0, MPI_COMM_WORLD);
@@ -104,6 +110,9 @@ int main(int argc, char ** argv) {
                     }
                 }
             }
+
+            log_debug("fps: %.1lf", 1.0 / (get_time() - ltime));
+            ltime = get_time();
 
         } while (visuals_update(full_output));
 
