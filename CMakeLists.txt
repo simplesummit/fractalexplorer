@@ -26,7 +26,11 @@ set (FRACTALEXPLORER_VERSION_MINOR 1)
 set (CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 
-find_package(SDL2)
+find_package(SDL2 REQUIRED)
+find_package(MPI REQUIRED)
+
+include_directories(${MPI_INCLUDE_PATH})
+
 
 if (ENABLE_CUDA)
     find_package(CUDA)
