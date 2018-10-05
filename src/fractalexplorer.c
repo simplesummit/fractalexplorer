@@ -159,7 +159,9 @@ int parse_args(int argc, char ** argv) {
             if (SEQ(optarg, "c")) {
                 fr.engine = FR_E_C;
             } else if (SEQ(optarg, "cuda")) {
+                #ifdef HAVE_CUDA
                 fr.engine = FR_E_CUDA;
+                #endif
             } else {
                 printf("Error: Unkown engine '%s'\n", optarg);
                 return 1;
@@ -364,9 +366,11 @@ void start_compute() {
                 if (fr.engine == FR_E_C) {
                     log_trace("mand_c starting");
                     calc_c(fr, compute_rank, fr.num_workers, compute_buffer);
+                    #ifdef HAVE_CUDA
                 } else if (fr.engine == FR_E_CUDA) {
                     log_trace("mand_cuda starting");
                     CUDA_EXEC
+                    #endif
                 } else {
                     log_error("Unknown engine");
                 }
