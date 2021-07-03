@@ -60,7 +60,7 @@ char *** gargv;
 bool use_fullscreen = false;
 bool show_cursor = true;
 
-
+fr_t fr;
 MPI_Datatype mpi_fr_t;
 int mpi_fr_blocklengths[mpi_fr_numitems] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
 MPI_Datatype mpi_fr_types[mpi_fr_numitems] = { MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT };

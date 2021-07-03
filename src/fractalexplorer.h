@@ -37,17 +37,17 @@ can also find a copy at http://www.gnu.org/licenses/.
 #include <sys/time.h>
 #include <getopt.h>
 
-bool use_fullscreen;
-bool show_cursor;
+extern bool use_fullscreen;
+extern bool show_cursor;
 
 
 #include "log.h"
 
 #include "fr.h"
 
-int fractal_types_idx;
-int fractal_types[FR_FRACTAL_NUM];
-char * fractal_types_names[FR_FRACTAL_NUM];
+extern int fractal_types_idx;
+extern int fractal_types[FR_FRACTAL_NUM];
+extern char * fractal_types_names[FR_FRACTAL_NUM];
 
 // time performance
 typedef struct tperf_t {
@@ -94,13 +94,12 @@ MPI_Datatype mpi_fr_types[mpi_fr_numitems];
 MPI_Aint mpi_fr_offsets[mpi_fr_numitems];
 */
 
-fr_t fr;
-fr_col_t col;
-MPI_Datatype mpi_fr_t;
+extern fr_t fr;
+extern fr_col_t col;
+extern MPI_Datatype mpi_fr_t;
+extern char * fractal_path_file;
+extern int world_size, world_rank;
 
-char * fractal_path_file;
-
-int world_size, world_rank;
 #define IS_HEAD (world_rank == 0)
 #define IS_COMPUTE (world_rank > 0)
 
